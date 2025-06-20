@@ -1,6 +1,8 @@
 import os
 import logging
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.authtoken.models import Token
@@ -21,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def signup(request):
     """
     POST /api/signup - Create new user account
@@ -65,6 +68,7 @@ def signup(request):
 
 
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def login(request):
     """
     POST /api/login - Authenticate user and return token
@@ -96,6 +100,8 @@ def login(request):
 
 
 @api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
 def upload_document(request):
     """
     POST /api/upload - Accept PDF/PNG/JPG files, save to media/, return file_id
@@ -112,8 +118,9 @@ def upload_document(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Save document
+        # Save document associated with the authenticated user
         document = UploadedDocument.objects.create(
+            user=request.user,
             file=uploaded_file,
             filename=uploaded_file.name,
             file_type=file_extension
@@ -125,6 +132,8 @@ def upload_document(request):
 
 
 @api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
 def ask_question(request):
     """
     POST /api/ask - Body {question}; return {answer, citations}
@@ -137,8 +146,9 @@ def ask_question(request):
         # In production, this would integrate with LangChain and OpenAI
         answer = f"Thank you for your question about '{question}'. This is a stub response for the MVP. In the full implementation, this would use AI to provide detailed visa and immigration guidance based on uploaded documents and official sources."
         
-        # Save chat message
+        # Save chat message associated with the authenticated user
         chat_message = ChatMessage.objects.create(
+            user=request.user,
             question=question,
             answer=answer
         )
@@ -158,6 +168,8 @@ def ask_question(request):
 
 
 @api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
 def schedule_appointment(request):
     """
     POST /api/schedule - Body {user, type, iso_date}; log "Reminder scheduled"
@@ -168,8 +180,9 @@ def schedule_appointment(request):
         appointment_type = serializer.validated_data['type']
         scheduled_date = serializer.validated_data['iso_date']
         
-        # Save appointment
+        # Save appointment associated with the authenticated user
         appointment = Appointment.objects.create(
+            user=request.user,
             user_name=user_name,
             appointment_type=appointment_type,
             scheduled_date=scheduled_date
@@ -184,4 +197,23 @@ def schedule_appointment(request):
             'appointment_id': appointment.id
         }, status=status.HTTP_201_CREATED)
     
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST) 
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def logout(request):
+    """
+    POST /api/logout - Delete user's auth token
+    """
+    try:
+        # Delete the user's token
+        request.user.auth_token.delete()
+        return Response({
+            'message': 'Successfully logged out'
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({
+            'error': 'Failed to logout'
+        }, status=status.HTTP_400_BAD_REQUEST) 

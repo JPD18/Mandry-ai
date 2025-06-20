@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 
 
 class UploadedDocument(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='documents')
     file = models.FileField(upload_to='documents/')
     filename = models.CharField(max_length=255)
     uploaded_at = models.DateTimeField(auto_now_add=True)
@@ -20,6 +21,7 @@ class Appointment(models.Model):
         ('interview_prep', 'Interview Preparation'),
     ]
     
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='appointments')
     user_name = models.CharField(max_length=100)
     appointment_type = models.CharField(max_length=50, choices=APPOINTMENT_TYPES)
     scheduled_date = models.DateTimeField()
@@ -31,6 +33,7 @@ class Appointment(models.Model):
 
 
 class ChatMessage(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_messages')
     question = models.TextField()
     answer = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
