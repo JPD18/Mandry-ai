@@ -4,13 +4,14 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
-from .models import UploadedDocument, Appointment, ChatMessage
+from .models import UploadedDocument, Appointment
 from .serializers import (
     FileUploadSerializer, 
     QuestionSerializer, 
     ScheduleSerializer,
     UploadedDocumentSerializer
 )
+from services.llm_service import default_llm, LLMService
 
 logger = logging.getLogger(__name__)
 
@@ -53,15 +54,8 @@ def ask_question(request):
     if serializer.is_valid():
         question = serializer.validated_data['question']
         
-        # For MVP, return a stub answer
-        # In production, this would integrate with LangChain and OpenAI
-        answer = f"Thank you for your question about '{question}'. This is a stub response for the MVP. In the full implementation, this would use AI to provide detailed visa and immigration guidance based on uploaded documents and official sources."
-        
-        # Save chat message
-        chat_message = ChatMessage.objects.create(
-            question=question,
-            answer=answer
-        )
+        # Use the default instance
+        response = default_llm.call("You are a travel assistant", question)
         
         # Mock citations for MVP
         citations = [
@@ -70,7 +64,7 @@ def ask_question(request):
         ]
         
         return Response({
-            'answer': answer,
+            'answer': response,
             'citations': citations
         }, status=status.HTTP_200_OK)
     

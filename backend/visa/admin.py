@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import UploadedDocument, Appointment, ChatMessage
+from .models import UploadedDocument, Appointment
 
 
 @admin.register(UploadedDocument)
@@ -16,12 +16,3 @@ class AppointmentAdmin(admin.ModelAdmin):
     search_fields = ['user_name']
 
 
-@admin.register(ChatMessage)
-class ChatMessageAdmin(admin.ModelAdmin):
-    list_display = ['question_preview', 'created_at']
-    list_filter = ['created_at']
-    search_fields = ['question', 'answer']
-    
-    def question_preview(self, obj):
-        return obj.question[:50] + "..." if len(obj.question) > 50 else obj.question
-    question_preview.short_description = 'Question' 
