@@ -31,4 +31,15 @@ class QuestionSerializer(serializers.Serializer):
 class ScheduleSerializer(serializers.Serializer):
     user = serializers.CharField(max_length=100)
     type = serializers.CharField(max_length=50)
-    iso_date = serializers.DateTimeField() 
+    iso_date = serializers.DateTimeField()
+
+
+class UserSignupSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150)
+    email = serializers.EmailField()
+    password = serializers.CharField(min_length=8, write_only=True)
+
+
+class UserLoginSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150)
+    password = serializers.CharField(write_only=True) 

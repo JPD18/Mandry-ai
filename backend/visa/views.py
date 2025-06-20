@@ -3,16 +3,96 @@ import logging
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.authtoken.models import Token
+from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
 from django.conf import settings
 from .models import UploadedDocument, Appointment, ChatMessage
 from .serializers import (
     FileUploadSerializer, 
     QuestionSerializer, 
     ScheduleSerializer,
-    UploadedDocumentSerializer
+    UploadedDocumentSerializer,
+    UserSignupSerializer,
+    UserLoginSerializer
 )
 
 logger = logging.getLogger(__name__)
+
+
+@api_view(['POST'])
+def signup(request):
+    """
+    POST /api/signup - Create new user account
+    """
+    serializer = UserSignupSerializer(data=request.data)
+    if serializer.is_valid():
+        username = serializer.validated_data['username']
+        email = serializer.validated_data['email']
+        password = serializer.validated_data['password']
+        
+        # Check if user already exists
+        if User.objects.filter(username=username).exists():
+            return Response(
+                {'error': 'Username already exists'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if User.objects.filter(email=email).exists():
+            return Response(
+                {'error': 'Email already exists'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create user
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password
+        )
+        
+        # Create token
+        token, created = Token.objects.get_or_create(user=user)
+        
+        return Response({
+            'message': 'User created successfully',
+            'token': token.key,
+            'user_id': user.id,
+            'username': user.username
+        }, status=status.HTTP_201_CREATED)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def login(request):
+    """
+    POST /api/login - Authenticate user and return token
+    """
+    serializer = UserLoginSerializer(data=request.data)
+    if serializer.is_valid():
+        username = serializer.validated_data['username']
+        password = serializer.validated_data['password']
+        
+        # Authenticate user
+        user = authenticate(username=username, password=password)
+        if user:
+            # Get or create token
+            token, created = Token.objects.get_or_create(user=user)
+            
+            return Response({
+                'message': 'Login successful',
+                'token': token.key,
+                'user_id': user.id,
+                'username': user.username
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response(
+                {'error': 'Invalid credentials'}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
