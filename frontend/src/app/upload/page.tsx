@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { api } from '@/lib/utils'
 import { Upload, FileText, AlertCircle, CheckCircle } from 'lucide-react'
 
 export default function UploadPage() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadResult, setUploadResult] = useState<{
@@ -14,6 +16,17 @@ export default function UploadPage() {
     message: string
     fileId?: number
   } | null>(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      setIsAuthenticated(true)
+    } else {
+      router.push('/login')
+    }
+    setLoading(false)
+  }, [router])
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -65,7 +78,18 @@ export default function UploadPage() {
     setUploadResult(null)
 
     try {
-      const response = await api.upload(file)
+      const token = localStorage.getItem('token')
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('http://localhost:8000/api/upload/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${token}`,
+        },
+        body: formData,
+      })
+
       const data = await response.json()
 
       if (response.ok) {
@@ -89,6 +113,20 @@ export default function UploadPage() {
     } finally {
       setUploading(false)
     }
+  }
+
+  // Show loading while checking authentication
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Loading...</div>
+      </div>
+    )
+  }
+
+  // Only show the content if authenticated
+  if (!isAuthenticated) {
+    return null
   }
 
   return (

@@ -1,14 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { api } from '@/lib/utils'
 import { Calendar, Clock, User, CheckCircle, AlertCircle } from 'lucide-react'
 
 export default function RemindersPage() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [formData, setFormData] = useState({
     user: '',
     type: 'consultation',
@@ -21,6 +23,17 @@ export default function RemindersPage() {
     success: boolean
     message: string
   } | null>(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      setIsAuthenticated(true)
+    } else {
+      router.push('/login')
+    }
+    setLoading(false)
+  }, [router])
 
   const appointmentTypes = [
     { value: 'consultation', label: 'Consultation' },
@@ -52,7 +65,20 @@ export default function RemindersPage() {
       // Combine date and time into ISO format
       const iso_date = new Date(`${formData.date}T${formData.time}`).toISOString()
       
-      const response = await api.schedule(formData.user, formData.type, iso_date)
+      const token = localStorage.getItem('token')
+      const response = await fetch('http://localhost:8000/api/schedule/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Token ${token}`,
+        },
+        body: JSON.stringify({
+          user: formData.user,
+          type: formData.type,
+          iso_date: iso_date
+        }),
+      })
+
       const data = await response.json()
 
       if (response.ok) {
@@ -83,6 +109,20 @@ export default function RemindersPage() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  // Show loading while checking authentication
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Loading...</div>
+      </div>
+    )
+  }
+
+  // Only show the content if authenticated
+  if (!isAuthenticated) {
+    return null
   }
 
   return (

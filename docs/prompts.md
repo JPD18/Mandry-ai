@@ -31,6 +31,44 @@ Scaffold **"Mandry-ai"** with a Django back-end and a Next.js front-end, all loc
 - Keep code minimal; no tests or styling polish.
 - Reply **only** with code blocks, each preceded by `### <filepath>`. 
 
+## Authentication Implementation (Added)
+prompt - add a basic user log in and sign up page to the front end and backend, it only needs username, email, password for now
+### Backend Authentication
+- Added Django REST Framework token authentication
+- New API endpoints:
+  * `POST /api/signup` - Create user account (username, email, password)
+  * `POST /api/login` - Authenticate user and return token
+- Updated `settings.py`:
+  * Added `rest_framework.authtoken` to `INSTALLED_APPS`
+  * Added `TokenAuthentication` to `DEFAULT_AUTHENTICATION_CLASSES`
+- Token-based authentication using Django's built-in User model
+
+### Frontend Authentication
+- New pages:
+  * `/login` - User login form
+  * `/signup` - User registration form
+- Features:
+  * Form validation (password confirmation, minimum length)
+  * Error handling with user feedback
+  * Token storage in localStorage
+  * Automatic redirect after successful authentication
+- Updated navigation to include Login/Sign Up links
+- Used shadcn/ui components for consistent styling
+
+### Usage
+1. Users are redirected to login/signup pages when not authenticated
+2. Users can create accounts with username, email, and password
+3. Login returns authentication token for API requests
+4. Frontend stores token and user info in localStorage
+5. All forms include proper validation and error handling
+6. Protected routes (/, /upload, /reminders) require authentication
+7. Navigation shows different options based on authentication status
+
+### Database
+- Run `python manage.py migrate` to create authentication tables
+- Django's built-in User model stores user credentials
+- Tokens stored in `authtoken_token` table 
+
 
 LLM service prompt-
 so the app uses llms to answer natural language questions thus we will need an llm_service.py file that makes sending posts to api modular similar to the following code, add this file 
@@ -141,3 +179,4 @@ class LLMService:
 
 # you can export a singleton for convenience
 default_llm = LLMService()
+

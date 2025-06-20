@@ -1,129 +1,129 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { api } from '@/lib/utils'
-import { Send } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
 
-interface Message {
-  id: number
-  type: 'user' | 'assistant'
-  content: string
-  citations?: { source: string; url: string }[]
-}
+export default function Home() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [username, setUsername] = useState('')
+  const [question, setQuestion] = useState('')
+  const [answer, setAnswer] = useState('')
+  const [askLoading, setAskLoading] = useState(false)
+  const router = useRouter()
 
-export default function ChatPage() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      type: 'assistant',
-      content: 'Hello! I\'m Mandry AI, your visa and immigration assistant. How can I help you today?',
+  useEffect(() => {
+    // Check if user is authenticated
+    const token = localStorage.getItem('token')
+    const storedUsername = localStorage.getItem('username')
+    
+    if (token && storedUsername) {
+      setIsAuthenticated(true)
+      setUsername(storedUsername)
+    } else {
+      // Redirect to login if not authenticated
+      router.push('/login')
     }
-  ])
-  const [inputValue, setInputValue] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+    setLoading(false)
+  }, [router])
+
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user_id')
+    localStorage.removeItem('username')
+    router.push('/login')
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!inputValue.trim() || isLoading) return
+    if (!question.trim()) return
 
-    const userMessage: Message = {
-      id: messages.length + 1,
-      type: 'user',
-      content: inputValue,
-    }
-
-    setMessages(prev => [...prev, userMessage])
-    setInputValue('')
-    setIsLoading(true)
-
+    setAskLoading(true)
     try {
-      const response = await api.ask(inputValue)
+      const token = localStorage.getItem('token')
+      const response = await fetch('http://localhost:8000/api/ask/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Token ${token}`,
+        },
+        body: JSON.stringify({ question }),
+      })
+
       const data = await response.json()
-
-      const assistantMessage: Message = {
-        id: messages.length + 2,
-        type: 'assistant',
-        content: data.answer,
-        citations: data.citations,
-      }
-
-      setMessages(prev => [...prev, assistantMessage])
+      setAnswer(data.answer || 'No response received')
     } catch (error) {
-      console.error('Error asking question:', error)
-      const errorMessage: Message = {
-        id: messages.length + 2,
-        type: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
-      }
-      setMessages(prev => [...prev, errorMessage])
+      setAnswer('Error: Could not get response from server')
     } finally {
-      setIsLoading(false)
+      setAskLoading(false)
     }
   }
 
+  // Show loading while checking authentication
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Loading...</div>
+      </div>
+    )
+  }
+
+  // Only show the main content if authenticated
+  if (!isAuthenticated) {
+    return null // This shouldn't show as we redirect above, but just in case
+  }
+
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto space-y-8">
+      <div className="text-center space-y-4">
+        <h1 className="text-4xl font-bold text-gray-900">
+          Welcome to Mandry AI, {username}!
+        </h1>
+        <p className="text-xl text-gray-600">
+          Your AI-powered visa and immigration consultant assistant
+        </p>
+        <Button 
+          onClick={handleLogout}
+          variant="outline"
+          className="ml-4"
+        >
+          Logout
+        </Button>
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle>Visa & Immigration Chat Assistant</CardTitle>
+          <CardTitle>Ask a Question</CardTitle>
           <CardDescription>
-            Ask questions about visa requirements, immigration processes, and get guidance based on official sources.
+            Get AI-powered assistance with your visa and immigration questions
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                    message.type === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted'
-                  }`}
-                >
-                  <p className="text-sm">{message.content}</p>
-                  {message.citations && message.citations.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-border">
-                      <p className="text-xs text-muted-foreground mb-1">Sources:</p>
-                      {message.citations.map((citation, index) => (
-                        <a
-                          key={index}
-                          href={citation.url}
-                          className="text-xs text-primary hover:underline block"
-                        >
-                          {citation.source}
-                        </a>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-muted rounded-lg px-4 py-2">
-                  <p className="text-sm">Thinking...</p>
-                </div>
-              </div>
-            )}
-          </div>
-          <form onSubmit={handleSubmit} className="flex space-x-2">
-            <Input
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Ask a question about visas, immigration, or requirements..."
-              disabled={isLoading}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Textarea
+              placeholder="What would you like to know about visas or immigration?"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              className="min-h-[100px]"
             />
-            <Button type="submit" disabled={isLoading || !inputValue.trim()}>
-              <Send className="h-4 w-4" />
+            <Button 
+              type="submit" 
+              disabled={askLoading || !question.trim()}
+              className="w-full"
+            >
+              {askLoading ? 'Getting answer...' : 'Ask Question'}
             </Button>
           </form>
+
+          {answer && (
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+              <h3 className="font-semibold mb-2">Answer:</h3>
+              <p className="text-gray-700">{answer}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
