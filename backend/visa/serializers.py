@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import UploadedDocument, Appointment, ChatMessage
+from .models import UploadedDocument, Appointment
 
 
 class UploadedDocumentSerializer(serializers.ModelSerializer):
@@ -13,11 +13,6 @@ class AppointmentSerializer(serializers.ModelSerializer):
         model = Appointment
         fields = ['id', 'user_name', 'appointment_type', 'scheduled_date', 'notes']
 
-
-class ChatMessageSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ChatMessage
-        fields = ['id', 'question', 'answer', 'created_at']
 
 
 class FileUploadSerializer(serializers.Serializer):
