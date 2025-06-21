@@ -283,10 +283,12 @@ function ChatPageContent() {
         onLogoClick={() => console.log("Logo clicked")}
         onChatClick={() => console.log("Chat clicked")}
         onAboutUsClick={() => console.log("About Us clicked")}
+        onScheduleClick={() => console.log("Schedule clicked")}
         onLoginClick={() => console.log("Login clicked")}
         onSignUpClick={() => console.log("Sign up clicked")}
         showAboutUs={true}
         showChat={true}
+        showSchedule={true}
       />
 
       <div className="pt-20 h-full flex flex-col">
