@@ -9,14 +9,16 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.conf import settings
-from .models import UploadedDocument, Appointment
+from .models import UploadedDocument, Appointment, UserProfile
 from .serializers import (
     FileUploadSerializer, 
     QuestionSerializer, 
     ScheduleSerializer,
     UploadedDocumentSerializer,
     UserSignupSerializer,
-    UserLoginSerializer
+    UserLoginSerializer,
+    UserProfileSerializer,
+    LangGraphChatSerializer
 )
 from services.llm_service import default_llm, LLMService
 
@@ -264,4 +266,69 @@ def logout(request):
     except Exception as e:
         return Response({
             'error': 'Failed to logout'
-        }, status=status.HTTP_400_BAD_REQUEST) 
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def user_profile(request):
+    """
+    GET /api/profile - Get user profile
+    PUT /api/profile - Update user profile
+    """
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+    
+    if request.method == 'GET':
+        serializer = UserProfileSerializer(profile)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    elif request.method == 'PUT':
+        serializer = UserProfileSerializer(profile, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def langgraph_chat(request):
+    """
+    POST /api/chat - LangGraph-powered visa assistant chat
+    Body: {message, session_state?}
+    Returns: {response, current_step, profile_complete, session_state}
+    """
+    from services.langgraph_service import visa_assistant_workflow
+    
+    serializer = LangGraphChatSerializer(data=request.data)
+    if serializer.is_valid():
+        message = serializer.validated_data['message']
+        session_state = serializer.validated_data.get('session_state')
+        
+        try:
+            # Process message through LangGraph workflow
+            result = visa_assistant_workflow.process_message(
+                user_id=request.user.id,
+                message=message,
+                current_state=session_state
+            )
+            
+            return Response({
+                'response': result['response'],
+                'current_step': result['current_step'],
+                'context_sufficient': result['context_sufficient'],
+                'missing_context_areas': result['missing_context_areas'],
+                'session_data': result['session_data'],
+                'message_history': result['message_history']
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"LangGraph chat error: {e}")
+            return Response({
+                'error': 'Sorry, I encountered an error processing your message. Please try again.',
+                'current_step': 'error'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST) 

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Textarea } from '@/components/ui/textarea'
 import { CitationList } from '@/components/ui/citation'
 import { MarkdownRenderer } from '@/components/ui/markdown-renderer'
-import { AlertCircle, CheckCircle, MessageSquare } from 'lucide-react'
+import { AlertCircle, CheckCircle, MessageSquare, User, Settings, MessageCircle } from 'lucide-react'
 
 interface Citation {
   title: string
@@ -15,11 +15,18 @@ interface Citation {
   snippet: string
 }
 
-interface ApiResponse {
-  answer: string
-  citations?: Citation[]
-  rag_verified?: boolean
-  source_count?: number
+interface ChatMessage {
+  type: 'human' | 'ai'
+  content: string
+}
+
+interface LangGraphResponse {
+  response: string
+  current_step: string
+  context_sufficient: boolean
+  missing_context_areas: string[]
+  session_data: any
+  message_history: ChatMessage[]
   error?: string
 }
 
@@ -27,9 +34,12 @@ export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [username, setUsername] = useState('')
-  const [question, setQuestion] = useState('')
-  const [response, setResponse] = useState<ApiResponse | null>(null)
-  const [askLoading, setAskLoading] = useState(false)
+  const [message, setMessage] = useState('')
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
+  const [currentStep, setCurrentStep] = useState<string>('assess_context')
+  const [contextSufficient, setContextSufficient] = useState(false)
+  const [sessionState, setSessionState] = useState<any>(null)
+  const [chatLoading, setChatLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
@@ -41,12 +51,48 @@ export default function Home() {
     if (token && storedUsername) {
       setIsAuthenticated(true)
       setUsername(storedUsername)
+      // Initialize the chat with a welcome message
+      initializeChat()
     } else {
       // Redirect to login if not authenticated
       router.push('/login')
     }
     setLoading(false)
   }, [router])
+
+  const initializeChat = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('http://localhost:8000/api/chat/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Token ${token}`,
+        },
+        body: JSON.stringify({ 
+          message: "Hello, I'd like to get started with my visa application.",
+          session_state: null 
+        }),
+      })
+
+      const data: LangGraphResponse = await response.json()
+      
+      if (response.ok) {
+        setChatHistory(data.message_history)
+        setCurrentStep(data.current_step)
+        setContextSufficient(data.context_sufficient)
+        setSessionState({
+          current_step: data.current_step,
+          context_sufficient: data.context_sufficient,
+          missing_context_areas: data.missing_context_areas,
+          session_data: data.session_data,
+          message_history: data.message_history
+        })
+      }
+    } catch (error) {
+      console.error('Failed to initialize chat:', error)
+    }
+  }
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -57,35 +103,49 @@ export default function Home() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!question.trim()) return
+    if (!message.trim()) return
 
-    setAskLoading(true)
+    setChatLoading(true)
     setError(null)
-    setResponse(null)
     
     try {
       const token = localStorage.getItem('token')
-      const apiResponse = await fetch('http://localhost:8000/api/ask/', {
+      const response = await fetch('http://localhost:8000/api/chat/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Token ${token}`,
         },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ 
+          message: message,
+          session_state: sessionState 
+        }),
       })
 
-      const data: ApiResponse = await apiResponse.json()
+      const data: LangGraphResponse = await response.json()
       
-      if (!apiResponse.ok) {
+      if (!response.ok) {
         throw new Error(data.error || 'Failed to get response from server')
       }
       
-      setResponse(data)
+      // Update chat state
+      setChatHistory(data.message_history)
+      setCurrentStep(data.current_step)
+      setContextSufficient(data.context_sufficient)
+      setSessionState({
+        current_step: data.current_step,
+        context_sufficient: data.context_sufficient,
+        missing_context_areas: data.missing_context_areas,
+        session_data: data.session_data,
+        message_history: data.message_history
+      })
+      setMessage('') // Clear input
+      
     } catch (error) {
-      console.error('API Error:', error)
+      console.error('Chat Error:', error)
       setError(error instanceof Error ? error.message : 'Error: Could not get response from server')
     } finally {
-      setAskLoading(false)
+      setChatLoading(false)
     }
   }
 
@@ -101,6 +161,51 @@ export default function Home() {
   // Only show the main content if authenticated
   if (!isAuthenticated) {
     return null // This shouldn't show as we redirect above, but just in case
+  }
+
+  const getStepTitle = () => {
+    switch (currentStep) {
+      case 'assess_context':
+        return 'Understanding Your Situation'
+      case 'gather_context':
+        return 'Learning About You'
+      case 'intelligent_qna':
+        return 'Visa Consultation'
+      case 'end':
+        return 'Session Complete'
+      default:
+        return 'Visa Assistant'
+    }
+  }
+
+  const getStepDescription = () => {
+    switch (currentStep) {
+      case 'assess_context':
+        return 'Analyzing your visa situation...'
+      case 'gather_context':
+        return 'Learning about your specific circumstances'
+      case 'intelligent_qna':
+        return 'Get personalized visa advice based on your situation'
+      case 'end':
+        return 'Thank you for using Mandry AI!'
+      default:
+        return 'Your AI-powered visa assistant'
+    }
+  }
+
+  const getStepIcon = () => {
+    switch (currentStep) {
+      case 'assess_context':
+        return <Settings className="h-5 w-5 animate-spin" />
+      case 'gather_context':
+        return <User className="h-5 w-5" />
+      case 'intelligent_qna':
+        return <MessageCircle className="h-5 w-5" />
+      case 'end':
+        return <CheckCircle className="h-5 w-5" />
+      default:
+        return <MessageSquare className="h-5 w-5" />
+    }
   }
 
   return (
@@ -121,30 +226,62 @@ export default function Home() {
         </Button>
       </div>
 
+      {/* Status Indicator */}
+      <div className="flex items-center justify-center gap-2 p-4 bg-blue-50 rounded-lg">
+        {getStepIcon()}
+        <span className="font-medium text-blue-900">
+          {contextSufficient ? 'Context Complete' : `Context ${sessionState?.session_data?.context_completeness || 0}% Complete`}
+        </span>
+        <span className="text-blue-700">•</span>
+        <span className="text-blue-700">{getStepTitle()}</span>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            Ask a Question
+            {getStepIcon()}
+            {getStepTitle()}
           </CardTitle>
           <CardDescription>
-            Get AI-powered assistance with your visa and immigration questions, backed by official sources
+            {getStepDescription()}
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Chat History */}
+          {chatHistory.length > 0 && (
+            <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
+              {chatHistory.map((msg, index) => (
+                <div key={index} className={`flex ${msg.type === 'human' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                    msg.type === 'human' 
+                      ? 'bg-blue-500 text-white' 
+                      : 'bg-gray-200 text-gray-800'
+                  }`}>
+                    <MarkdownRenderer content={msg.content} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Message Input */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <Textarea
-              placeholder="What would you like to know about visas or immigration?"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
+              placeholder={
+                currentStep === 'gather_context' 
+                  ? "Tell me about your situation..."
+                  : "Ask me anything about your visa application..."
+              }
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
               className="min-h-[100px]"
             />
             <Button 
               type="submit" 
-              disabled={askLoading || !question.trim()}
+              disabled={chatLoading || !message.trim()}
               className="w-full"
             >
-              {askLoading ? 'Getting answer...' : 'Ask Question'}
+              {chatLoading ? 'Sending...' : 'Send Message'}
             </Button>
           </form>
 
@@ -156,50 +293,6 @@ export default function Home() {
                 <h3 className="font-semibold text-red-800 mb-1">Error</h3>
                 <p className="text-red-700 text-sm">{error}</p>
               </div>
-            </div>
-          )}
-
-          {/* Response Display */}
-          {response && (
-            <div className="mt-6 space-y-4">
-              {/* Status Indicator */}
-              <div className="flex items-center gap-2 text-sm">
-                {response.rag_verified ? (
-                  <>
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-green-700 font-medium">
-                      Verified with {response.source_count || 0} official sources
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="h-4 w-4 text-amber-500" />
-                    <span className="text-amber-700 font-medium">
-                      Verification temporarily unavailable
-                    </span>
-                  </>
-                )}
-              </div>
-
-              {/* Answer Section */}
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <h3 className="font-semibold mb-3 flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4" />
-                  Answer:
-                </h3>
-                <MarkdownRenderer 
-                  content={response.answer} 
-                  className="text-gray-800"
-                />
-              </div>
-
-              {/* Citations Section */}
-              {response.citations && response.citations.length > 0 && (
-                <CitationList 
-                  citations={response.citations} 
-                  ragVerified={response.rag_verified}
-                />
-              )}
             </div>
           )}
         </CardContent>

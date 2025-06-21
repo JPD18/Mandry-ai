@@ -8,4 +8,6 @@ urlpatterns = [
     path('upload/', views.upload_document, name='upload_document'),
     path('ask/', views.ask_question, name='ask_question'),
     path('schedule/', views.schedule_appointment, name='schedule_appointment'),
+    path('profile/', views.user_profile, name='user_profile'),
+    path('chat/', views.langgraph_chat, name='langgraph_chat'),
 ] 
