@@ -13,6 +13,8 @@ import { ChatAuthGuard } from "@/components/chat-auth-guard"
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
 import { CitationList } from "@/components/ui/citation"
 import { ProfileDropdown } from "@/components/ui/profile-dropdown"
+import { MandryLoadingSpinner } from "@/components/ui/icons/MandryLoadingSpinner"
+import { TypingIndicator } from "@/components/ui/typing-indicator"
 
 interface Message {
   id: string
@@ -53,11 +55,23 @@ function ChatPageContent() {
   const [completionPercentage, setCompletionPercentage] = useState(75)
   const [processedDocuments, setProcessedDocuments] = useState<ProcessedDocument[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [showTypingIndicator, setShowTypingIndicator] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const conversationStarted = useRef(false);
   const [sessionState, setSessionState] = useState<SessionState | null>(null);
   const [refreshProfileTrigger, setRefreshProfileTrigger] = useState(0);
   const [rightSidebarView, setRightSidebarView] = useState<'upload' | 'profile'>('upload');
+
+  const handleTypingComplete = () => {
+    setShowTypingIndicator(false);
+    // Add the welcome message as an actual assistant message
+    const welcomeMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      role: "assistant",
+      content: "Hello! I'm your AI assistant. I'm here to help you navigate through any challenge. How can I assist you today?",
+    };
+    setMessages((prev) => [...prev, welcomeMessage]);
+  };
 
   const startConversation = async () => {
     setIsLoading(true);
@@ -170,11 +184,12 @@ function ChatPageContent() {
 
   useEffect(() => {
     // Start the conversation when the component mounts, but only once.
-    if (!conversationStarted.current) {
+    // Don't start if typing indicator is active
+    if (!conversationStarted.current && !showTypingIndicator) {
       startConversation();
       conversationStarted.current = true;
     }
-  }, []);
+  }, [showTypingIndicator]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
@@ -413,15 +428,15 @@ function ChatPageContent() {
                             "inset 0 0 15px rgba(255, 255, 255, 0.3), inset 0 0 30px rgba(255, 255, 255, 0.1)",
                         }}
                       ></div>
-                      <div className="bg-white/10 text-gray-100 border-white/20 px-6 py-4 rounded-2xl backdrop-blur-sm border">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                          <span className="text-sm">Thinking...</span>
-                        </div>
+                      <div className="relative bg-white/10 border-white/20 px-6 rounded-2xl backdrop-blur-sm border h-10 flex items-center justify-center">
+                        <MandryLoadingSpinner className="w-12 h-12" />
                       </div>
                     </motion.div>
+                  )}
+
+                  {/* Typing indicator */}
+                  {showTypingIndicator && !isLoading && (
+                    <TypingIndicator onTypingComplete={handleTypingComplete} />
                   )}
                 </div>
               )}
@@ -437,20 +452,46 @@ function ChatPageContent() {
               <div className="flex space-x-4 max-w-4xl mx-auto">
                 <ChatInput
                   value={message}
-                  onChange={(e) => setMessage(e.target.value)}
+                  onChange={(e) => {
+                    setMessage(e.target.value);
+                    // Hide typing indicator when user starts typing
+                    if (e.target.value.trim() !== '') {
+                      setShowTypingIndicator(false);
+                    }
+                  }}
                   placeholder="Ask Mandry"
                   className="flex-1 backdrop-blur-sm border-white/20 rounded-xl px-6 py-4 focus:border-[#FFF309]/50 focus:ring-[#FFF309]/20 text-white placeholder:text-gray-300"
                   style={{ background: 'transparent' }}
+                  onClick={() => {
+                    if (messages.length === 0 && !conversationStarted.current) {
+                      setShowTypingIndicator(true);
+                    }
+                  }}
+                  onFocus={() => {
+                    if (messages.length === 0 && !conversationStarted.current) {
+                      setShowTypingIndicator(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    // Only hide if user hasn't started typing
+                    if (message.trim() === '') {
+                      setShowTypingIndicator(false);
+                    }
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
+                      setShowTypingIndicator(false);
                       handleSendMessage();
                     }
                   }}
                   disabled={isLoading}
                 />
                 <Button
-                  onClick={() => handleSendMessage()}
+                  onClick={() => {
+                    setShowTypingIndicator(false);
+                    handleSendMessage();
+                  }}
                   disabled={isLoading}
                   className="px-4 py-4 bg-gradient-to-r from-[#FFF309] to-[#FFF309]/80 hover:from-[#FFF309]/90 hover:to-[#FFF309]/70 font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-[#FFF309]/25 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
