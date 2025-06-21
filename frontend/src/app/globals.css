@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
@@ -23,6 +24,7 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 94.1%;
+
     --radius: 0.5rem;
   }
 
@@ -33,8 +35,8 @@
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 84% 4.9%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217.2 32.6% 17.5%;
@@ -45,7 +47,7 @@
     --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
+    --ring: 212.7 26.8% 83.9%;
   }
 }
 
@@ -68,4 +70,68 @@
     margin: 0;
     padding: 0;
   }
+}
+
+/* Custom styles for citations and markdown */
+@layer utilities {
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .citation-ref {
+    @apply text-blue-600 hover:text-blue-800 cursor-pointer font-medium no-underline;
+    font-size: 0.75rem;
+  }
+  
+  .citation-ref:hover {
+    @apply underline;
+  }
+}
+
+/* Prose styling for markdown content */
+.prose {
+  @apply text-gray-800 leading-relaxed;
+}
+
+.prose p {
+  @apply mb-4 last:mb-0;
+}
+
+.prose strong {
+  @apply font-semibold text-gray-900;
+}
+
+.prose em {
+  @apply italic;
+}
+
+.prose ul {
+  @apply list-disc list-inside mb-4 space-y-1;
+}
+
+.prose ol {
+  @apply list-decimal list-inside mb-4 space-y-1;
+}
+
+.prose li {
+  @apply text-gray-700;
+}
+
+.prose a {
+  @apply text-blue-600 hover:text-blue-800 underline;
+}
+
+.prose blockquote {
+  @apply border-l-4 border-gray-300 pl-4 italic text-gray-600 mb-4;
+}
+
+.prose code {
+  @apply bg-gray-100 px-1 py-0.5 rounded text-sm font-mono;
+}
+
+.prose pre {
+  @apply bg-gray-50 p-3 rounded-lg overflow-x-auto text-sm font-mono mb-4;
 } 

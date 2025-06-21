@@ -70,6 +70,7 @@ export default function RootLayout({
                   <span className="font-bold text-xl text-white">Mandry AI</span>
                 </Link>
                 
+
                 {/* About Us Button */}
                 {pathname !== '/about' ? (
                   <Link
@@ -80,6 +81,48 @@ export default function RootLayout({
                   >
                     About Us
                   </Link>
+
+                {isAuthenticated ? (
+                  <>
+                    <nav className="flex items-center space-x-6 text-sm font-medium">
+                      <Link
+                        href="/"
+                        className={`transition-colors hover:text-foreground/80 ${
+                          pathname === '/' ? 'text-foreground' : 'text-foreground/60'
+                        }`}
+                      >
+                        AI Assistant
+                      </Link>
+                      <Link
+                        href="/upload"
+                        className={`transition-colors hover:text-foreground/80 ${
+                          pathname === '/upload' ? 'text-foreground' : 'text-foreground/60'
+                        }`}
+                      >
+                        Documents
+                      </Link>
+                      <Link
+                        href="/reminders"
+                        className={`transition-colors hover:text-foreground/80 ${
+                          pathname === '/reminders' ? 'text-foreground' : 'text-foreground/60'
+                        }`}
+                      >
+                        Reminders
+                      </Link>
+                    </nav>
+                    <div className="ml-auto flex items-center space-x-4">
+                      <span className="text-sm text-muted-foreground">
+                        Welcome, {username}
+                      </span>
+                      <button
+                        onClick={handleLogout}
+                        className="text-sm transition-colors hover:text-foreground/80 text-foreground/60"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  </>
+
                 ) : (
                   <span className="text-gray-500 font-medium cursor-default">
                     About Us

@@ -181,3 +181,18 @@ class LLMService:
 default_llm = LLMService()
 
 RAG PROMPT-  create a rag based on this search, so extracting the main query from the users question, sending it to the valyu api, and feeding its response to the llm to enrich its context
+## Implementing a static folder serving from djanogo:
+
+
+Citations prompt- so in the chat page, when context is retrieved it is correctly fed to the LLM and then passed to the UI however the citations format and text formatting of the q&a does not work, investigate this and create a plan to make clear citations and text formatting
+
+doc processing promtp - ok so for document upload it uploads docs but doesnt do anything, similar to valyu.py for search I want to make a modular section for doc upload and extraction so extracting the text from the doc for verification, the documents uploaded should not be stored anywhere only processed, the basic flow is upload doc, extract text, feed text to llm that verfies validity and returns true or false to it
+this is the basic idea so keep it simple maintainable and modular for us to exntend it and change it easily in future
+
+I have frontend files located in @/frontend folder which is build by npm run build and then I need to run next export. afterwards I need to move all of the static files to the new folder called static in @/backend, afterwards add code to backend for django server to serve static content there at the root of the api
+Citations prompt- so in the chat page, when context is retrieved it is correctly fed to the LLM and then passed to the UI however the citations format and text formatting of the q&a does not work, investigate this and create a plan to make clear citations and text formatting
+
+scheduling prompt- thanks for all your help so far claude youre great! lets enhance the schedule service in a similar way to the document service, it should be modular and maintainable following the best sotware practices. its main purpose is to remind the user about their visa appointments and visa expires, so should be a page that allows the user to add a deadline and the system sends a reminder to their email close to the time, review the current scheduler assess the requirements and determine the most efficient way to implement this feature of the app
+
+refactoring prompt- In the future we want to create a langgraph agent that is able to call tools to do the various functions of our app, namely search using valyu when needing context, document verification when docs are uploaded( never store docs they are only processed), and scheduling reminders for appointments and expires
+we currently have api for these features, review all of the code for these features and create a plan to make the compatible for tool calling in langraph, the app should be able to work without the langraph all you are doing is refactoring code for the future, do not add langgraph all you are doing is preparing the functions or if they are already able to be callable by the langraph agent then do nothing to them, so your main goal is to improve the code quality maintainability modularity of the code and organise it e.g. moving valyu.py to services
