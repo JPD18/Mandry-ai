@@ -23,7 +23,7 @@ class LLMService:
         self,
         system_prompt: Optional[str] = None,
         user_message: Optional[str] = None,
-        extra_params: Optional[Dict[str, Any]] = Ngione,
+        extra_params: Optional[Dict[str, Any]] = None,
     ) -> str:
         """High-level convenience wrapper for chat-completion endpoints.
 
