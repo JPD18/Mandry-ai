@@ -3,16 +3,31 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 
+interface Citation {
+  title: string
+  url: string
+  snippet: string
+}
+
 interface MarkdownRendererProps {
   content: string
+  citations?: Citation[]
   className?: string
 }
 
-export function MarkdownRenderer({ content, className = '' }: MarkdownRendererProps) {
-  // Transform citation references [Source X] into clickable components
+export function MarkdownRenderer({ content, citations = [], className = '' }: MarkdownRendererProps) {
+  // Transform citation references [Source X] into clickable superscripts that link directly to the source URL when available
   const transformCitations = (text: string) => {
     return text.replace(/\[Source (\d+)\]/g, (_, sourceNumber) => {
-      return `<sup id="ref-${sourceNumber}" class="citation-ref"><a href="#cite-${sourceNumber}" class="text-blue-600 hover:text-blue-800">[${sourceNumber}]</a></sup>`
+      const index = parseInt(sourceNumber, 10) - 1
+      const citation = citations[index]
+      // Fallback to footnote anchor if url not found
+      const targetUrl = citation?.url || `#cite-${sourceNumber}`
+      const isExternal = targetUrl.startsWith('http')
+      const linkAttributes = isExternal
+        ? `href="${targetUrl}" target="_blank" rel="noopener noreferrer"`
+        : `href="${targetUrl}"`
+      return `<sup id="ref-${sourceNumber}" class="citation-ref"><a ${linkAttributes} class="text-blue-600 hover:text-blue-800">[${sourceNumber}]</a></sup>`
     })
   }
 

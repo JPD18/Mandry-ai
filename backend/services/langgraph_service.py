@@ -280,18 +280,31 @@ Focus on capturing any additional context that would help understand their visa 
             
             # Process based on current step - EXACTLY ONE STEP
             logger.info(f"🚀 ROUTING TO HANDLER: {current_step}")
+            citations: List[Dict[str, Any]] = []  # Default empty citations
+            
+            # Call the appropriate handler
             if current_step == "assess_context":
-                response, next_step = self._handle_assess_context(user, profile, message)
+                handler_result = self._handle_assess_context(user, profile, message)
             elif current_step == "gather_context":
-                response, next_step = self._handle_gather_context(user, profile, message, previous_question)
+                handler_result = self._handle_gather_context(user, profile, message, previous_question)
             elif current_step == "provide_initial_info":
-                response, next_step = self._handle_provide_initial_info(user, profile, message)
+                handler_result = self._handle_provide_initial_info(user, profile, message)
             elif current_step == "intelligent_qna":
-                response, next_step = self._handle_qna(user, profile, message)
+                handler_result = self._handle_qna(user, profile, message)
             else:
                 logger.info(f"🏁 END STATE REACHED: {current_step}")
-                response = "Thank you for using Mandry AI!"
-                next_step = "end"
+                handler_result = ("Thank you for using Mandry AI!", "end")
+            
+            # Unpack handler_result which could be length 2 or 3
+            if isinstance(handler_result, tuple):
+                if len(handler_result) == 3:
+                    response, next_step, citations = handler_result
+                else:
+                    response, next_step = handler_result  # type: ignore
+            else:
+                # Unexpected scenario, treat as simple response string
+                response = str(handler_result)
+                next_step = "intelligent_qna"
             
             logger.info(f"✅ HANDLER COMPLETED - Response Length: {len(response)}, Next Step: {next_step}")
             
@@ -308,7 +321,9 @@ Focus on capturing any additional context that would help understand their visa 
                     "context_completeness": profile.get_context_completeness()
                 },
                 "message_history": message_history,
-                "last_question": response if next_step == "gather_context" else None
+                "last_question": response if next_step == "gather_context" else None,
+                "citations": citations,
+                "source_count": len(citations)
             }
             
         except Exception as e:
@@ -320,7 +335,9 @@ Focus on capturing any additional context that would help understand their visa 
                 "missing_context_areas": [],
                 "session_data": {},
                 "message_history": [],
-                "last_question": None
+                "last_question": None,
+                "citations": [],
+                "source_count": 0
             }
     
     def _handle_assess_context(self, user: User, profile: UserProfile, message: str) -> tuple[str, str]:
@@ -480,7 +497,7 @@ Generate an appropriate response that acknowledges their partial profile and ask
         logger.info(f"🔚 GATHER_CONTEXT RESULT - Next Step: {next_step}")
         return response, next_step
     
-    def _handle_provide_initial_info(self, user: User, profile: UserProfile, message: str) -> tuple[str, str]:
+    def _handle_provide_initial_info(self, user: User, profile: UserProfile, message: str) -> tuple[str, str, List[Dict[str, Any]]]:
         """
         Proactively provides initial visa information based on the completed profile.
         This is triggered automatically when context is complete.
@@ -519,8 +536,8 @@ Generate an appropriate response that acknowledges their partial profile and ask
         try:
             logger.info("🤖 Generating initial info summary with RAG context...")
             response = anthropic_llm.call(
-                system_prompt=rag_prompt, # This is a full prompt with context and instructions
-                user_message="", # The user question is already in the rag_prompt
+                system_prompt=rag_prompt,  # This is a full prompt with context and instructions
+                user_message="",  # The user question is already in the rag_prompt
                 extra_params={"max_tokens": 600, "temperature": 0.5}
             )
             
@@ -529,7 +546,7 @@ Generate an appropriate response that acknowledges their partial profile and ask
             
             logger.info(f"✅ Initial info summary generated. Length: {len(response)}")
             
-            return response, "intelligent_qna"
+            return response, "intelligent_qna", sources
         
         except Exception as e:
             logger.error(f"LLM call failed for initial info summary: {e}")
@@ -619,7 +636,7 @@ Ask for the specific missing information. Do not repeat questions about informat
         
         return response
     
-    def _handle_qna(self, user: User, profile: UserProfile, message: str) -> tuple[str, str]:
+    def _handle_qna(self, user: User, profile: UserProfile, message: str) -> tuple[str, str, List[Dict[str, Any]]]:
         """Handle Q&A step with intelligent AI responses"""
         logger.info(f"💬 QNA HANDLER - User: {user.username}, Message: '{message[:30]}...'")
         
@@ -627,6 +644,7 @@ Ask for the specific missing information. Do not repeat questions about informat
         message_lower = message.lower()
         end_phrases = ["goodbye", "thank you", "bye", "exit", "quit", "that's all", "thanks"]
         
+        citations: List[Dict[str, Any]] = []
         if any(phrase in message_lower for phrase in end_phrases):
             logger.info(f"👋 END PHRASE DETECTED - Ending conversation")
             response = "Thank you for using Mandry AI! Feel free to return anytime with more visa questions!"
@@ -634,20 +652,21 @@ Ask for the specific missing information. Do not repeat questions about informat
         else:
             logger.info(f"🤖 GENERATING AI RESPONSE")
             try:
-                # Generate intelligent response using AI
-                response = self._generate_intelligent_response(profile, message)
+                # Generate intelligent response using AI (now returns response and citations)
+                response, citations = self._generate_intelligent_response(profile, message)
                 next_step = "intelligent_qna"
             except Exception as e:
                 logger.warning(f"AI response generation failed: {e}")
                 # Fallback to simple response
                 response = f"Thank you for your question about '{message[:50]}...'. As a {profile.nationality or 'person'} interested in {profile.visa_intent or 'visas'}, I'd recommend consulting with official visa requirements. What else would you like to know?"
                 next_step = "intelligent_qna"
+                citations = []
         
-        logger.info(f"🔚 QNA RESULT - Next Step: {next_step}")
-        return response, next_step
+        logger.info(f"🔚 QNA RESULT - Next Step: {next_step}, Citations: {len(citations)}")
+        return response, next_step, citations
     
-    def _generate_intelligent_response(self, profile: UserProfile, user_question: str) -> str:
-        """Generate intelligent, contextual responses using AI"""
+    def _generate_intelligent_response(self, profile: UserProfile, user_question: str) -> tuple[str, List[Dict[str, Any]]]:
+        """Generate intelligent, contextual responses using AI and return citations"""
         
         # Build comprehensive context
         context_info = []
@@ -666,13 +685,22 @@ Ask for the specific missing information. Do not repeat questions about informat
         
         context_str = "\n".join(context_info) if context_info else "Limited profile information available"
         
-        # Use RAG to get an enhanced prompt
+        query_parts = [
+            f"General visa requirements and required documents for a {profile.nationality} citizen",
+            f"applying for a {profile.visa_intent}",
+            f"to {profile.destination_country}",
+        ]
+        if profile.current_location:
+            query_parts.append(f"from {profile.current_location}")
+        
+        search_query = " ".join(query_parts)
+        # Use RAG to get an enhanced prompt and sources for citations
         enhanced_prompt, sources = default_search_service.get_rag_enhanced_prompt_with_sources(
-            user_question=user_question,
+            user_question=user_question + search_query,
             max_sources=3
         )
 
-        # We can augment the RAG prompt with our detailed profile context
+        # Augment the RAG prompt with detailed profile context
         final_prompt = f"""{enhanced_prompt}
 
 Here is some additional user profile information to further personalize the response:
@@ -681,11 +709,11 @@ Here is some additional user profile information to further personalize the resp
 
         response = anthropic_llm.call(
             system_prompt=final_prompt,
-            user_message="", # User question is already in the enhanced_prompt
+            user_message="",  # User question is already in the enhanced_prompt
             extra_params={"max_tokens": 400, "temperature": 0.7}
         )
         
-        return response
+        return response, sources
 
     def _get_next_question(self, profile: UserProfile) -> str:
         """Get the next question to ask based on what's missing"""
