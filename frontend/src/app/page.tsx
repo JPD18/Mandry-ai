@@ -33,11 +33,9 @@ export default function HomePage() {
   }
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 overflow-hidden">
-      <AnimatePresence mode="wait">
-        {isLoading ? <LoadingScreen key="loading" /> : <MainContent key="main" />}
-      </AnimatePresence>
-    </div>
+    <AnimatePresence mode="wait">
+      {isLoading ? <LoadingScreen key="loading" /> : <MainContent key="main" />}
+    </AnimatePresence>
   )
 
   function LoadingScreen() {
@@ -122,7 +120,6 @@ export default function HomePage() {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.6 }}
-        className="fixed inset-0 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 overflow-hidden"
       >
         {/* Font loading */}
         <style jsx global>{`
@@ -134,9 +131,7 @@ export default function HomePage() {
         `}</style>
 
         {/* Main Content */}
-        <div className="absolute inset-0 flex flex-col">
-          <HeroSection />
-        </div>
+        <HeroSection />
       </motion.div>
     )
   }
@@ -147,7 +142,7 @@ export default function HomePage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="flex-1 flex items-center justify-center px-6 py-32"
+        className="flex-1 flex items-center justify-center px-6 py-16 min-h-[calc(100vh-5rem)]"
       >
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">

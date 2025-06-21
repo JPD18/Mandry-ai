@@ -77,19 +77,31 @@ export default function RootLayout({
                   <nav className="flex items-center space-x-6 text-sm font-medium">
                     <Link
                       href="/dashboard"
-                      className="text-gray-300 hover:text-white transition-colors duration-200"
+                      className={`transition-colors duration-200 ${
+                        pathname === '/dashboard' 
+                          ? "text-gray-500 cursor-default" 
+                          : "text-gray-300 hover:text-white"
+                      }`}
                     >
                       Chat
                     </Link>
                     <Link
                       href="/upload"
-                      className="text-gray-300 hover:text-white transition-colors duration-200"
+                      className={`transition-colors duration-200 ${
+                        pathname === '/upload' 
+                          ? "text-gray-500 cursor-default" 
+                          : "text-gray-300 hover:text-white"
+                      }`}
                     >
                       Upload Documents
                     </Link>
                     <Link
                       href="/reminders"
-                      className="text-gray-300 hover:text-white transition-colors duration-200"
+                      className={`transition-colors duration-200 ${
+                        pathname === '/reminders' 
+                          ? "text-gray-500 cursor-default" 
+                          : "text-gray-300 hover:text-white"
+                      }`}
                     >
                       Schedule Appointment
                     </Link>
@@ -113,18 +125,31 @@ export default function RootLayout({
                   </>
                 ) : (
                   <>
-                    <Link
-                      href="/login"
-                      className="text-gray-300 hover:text-white transition-colors duration-200 font-medium"
-                    >
-                      Log In
-                    </Link>
-                    <Link
-                      href="/signup"
-                      className="px-6 py-2 border-2 border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-slate-900 font-semibold rounded-lg transition-all duration-200 hover:scale-105"
-                    >
-                      Sign Up
-                    </Link>
+                    {pathname !== '/login' && pathname !== '/signup' ? (
+                      <>
+                        <Link
+                          href="/login"
+                          className="text-gray-300 hover:text-white transition-colors duration-200 font-medium"
+                        >
+                          Log In
+                        </Link>
+                        <Link
+                          href="/signup"
+                          className="px-6 py-2 border-2 border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-slate-900 font-semibold rounded-lg transition-all duration-200 hover:scale-105"
+                        >
+                          Sign Up
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-gray-500 font-medium cursor-default">
+                          Log In
+                        </span>
+                        <span className="px-6 py-2 border-2 border-gray-600 text-gray-500 font-semibold rounded-lg cursor-default">
+                          Sign Up
+                        </span>
+                      </>
+                    )}
                   </>
                 )}
               </div>

@@ -15,7 +15,7 @@ export default function AboutUsPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+    <>
       {/* Font loading */}
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Misto:wght@400;500;600;700&display=swap');
@@ -29,7 +29,7 @@ export default function AboutUsPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="flex-1 px-6 py-32 pt-28"
+        className="flex-1 px-6 py-12"
       >
         <div className="max-w-7xl mx-auto">
           {/* About Us Header */}
@@ -97,7 +97,7 @@ export default function AboutUsPage() {
           </motion.div>
         </div>
       </motion.section>
-    </div>
+    </>
   )
 }
 
