@@ -9,17 +9,21 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.conf import settings
-from .models import UploadedDocument, Appointment
+from .models import UploadedDocument, Appointment, Reminder
 from .serializers import (
     FileUploadSerializer, 
     QuestionSerializer, 
     ScheduleSerializer,
     UploadedDocumentSerializer,
     UserSignupSerializer,
-    UserLoginSerializer
+    UserLoginSerializer,
+    ReminderSerializer,
+    CreateReminderSerializer,
+    UpdateReminderStatusSerializer
 )
 from services.llm_service import default_llm, LLMService
 from services.document_service import default_document_service, DocumentProcessingException
+from services.schedule_service import default_schedule_service, ScheduleServiceException
 
 logger = logging.getLogger(__name__)
 
@@ -219,9 +223,126 @@ def ask_question(request):
 @api_view(['POST'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
+def create_reminder(request):
+    """
+    POST /api/reminders - Create a new reminder with intelligent scheduling
+    Body: {title, description, reminder_type, target_date, priority, notes, custom_intervals}
+    """
+    serializer = CreateReminderSerializer(data=request.data)
+    if serializer.is_valid():
+        try:
+            result = default_schedule_service.create_reminder(
+                user=request.user,
+                reminder_data=serializer.validated_data
+            )
+            
+            return Response(result, status=status.HTTP_201_CREATED)
+            
+        except ScheduleServiceException as e:
+            return Response({
+                'error': str(e)
+            }, status=e.status_code)
+            
+        except Exception as e:
+            logger.error(f"Unexpected error creating reminder: {str(e)}")
+            return Response({
+                'error': 'Failed to create reminder'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_reminders(request):
+    """
+    GET /api/reminders - Get user's reminders
+    Query params: status (optional), limit (optional, default 50)
+    """
+    try:
+        status_filter = request.GET.get('status')
+        limit = int(request.GET.get('limit', 50))
+        
+        reminders = default_schedule_service.get_user_reminders(
+            user=request.user,
+            status=status_filter,
+            limit=limit
+        )
+        
+        return Response({
+            'reminders': reminders,
+            'count': len(reminders)
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error getting user reminders: {str(e)}")
+        return Response({
+            'error': 'Failed to retrieve reminders'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['PUT'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def update_reminder_status(request, reminder_id):
+    """
+    PUT /api/reminders/{id}/status - Update reminder status
+    Body: {status}
+    """
+    serializer = UpdateReminderStatusSerializer(data=request.data)
+    if serializer.is_valid():
+        try:
+            success = default_schedule_service.update_reminder_status(
+                reminder_id=reminder_id,
+                status=serializer.validated_data['status'],
+                user=request.user
+            )
+            
+            if success:
+                return Response({
+                    'message': 'Reminder status updated successfully'
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'error': 'Failed to update reminder status'
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            logger.error(f"Error updating reminder status: {str(e)}")
+            return Response({
+                'error': 'Failed to update reminder status'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def process_reminders(request):
+    """
+    POST /api/process-reminders - Manually trigger reminder processing (admin/testing)
+    """
+    try:
+        result = default_schedule_service.process_due_reminders()
+        return Response(result, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error processing reminders: {str(e)}")
+        return Response({
+            'error': 'Failed to process reminders'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# Keep the old schedule_appointment for backward compatibility
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
 def schedule_appointment(request):
     """
     POST /api/schedule - Body {user, type, iso_date}; log "Reminder scheduled"
+    DEPRECATED: Use create_reminder endpoint instead
     """
     serializer = ScheduleSerializer(data=request.data)
     if serializer.is_valid():
@@ -229,7 +350,7 @@ def schedule_appointment(request):
         appointment_type = serializer.validated_data['type']
         scheduled_date = serializer.validated_data['iso_date']
         
-        # Save appointment associated with the authenticated user
+        # Save appointment associated with the authenticated user (old model)
         appointment = Appointment.objects.create(
             user=request.user,
             user_name=user_name,
@@ -237,13 +358,32 @@ def schedule_appointment(request):
             scheduled_date=scheduled_date
         )
         
+        # Also create a reminder using the new system
+        try:
+            reminder_data = {
+                'title': f"{appointment_type.replace('_', ' ').title()} for {user_name}",
+                'description': f"Appointment scheduled via legacy API",
+                'reminder_type': appointment_type,
+                'target_date': scheduled_date,
+                'priority': 'medium'
+            }
+            
+            default_schedule_service.create_reminder(
+                user=request.user,
+                reminder_data=reminder_data
+            )
+            
+        except Exception as e:
+            logger.warning(f"Failed to create reminder for legacy appointment: {str(e)}")
+        
         # Log reminder
         logger.info(f"Reminder scheduled for {user_name} - {appointment_type} on {scheduled_date}")
         print(f"Reminder scheduled for {user_name} - {appointment_type} on {scheduled_date}")
         
         return Response({
             'message': 'Reminder scheduled successfully',
-            'appointment_id': appointment.id
+            'appointment_id': appointment.id,
+            'note': 'This endpoint is deprecated. Use /api/reminders instead.'
         }, status=status.HTTP_201_CREATED)
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
