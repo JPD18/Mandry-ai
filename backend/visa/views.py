@@ -140,21 +140,23 @@ def ask_question(request):
     POST /api/ask - Body {question}; return {answer, citations}
     RAG-verified with Valyu Search API against gov.uk and other official sources
     """
-    from .valyu import valyu_search, get_rag_enhanced_prompt, ValyuAPIException
+    from .valyu import get_rag_enhanced_prompt_with_sources, ValyuAPIException
     
     serializer = QuestionSerializer(data=request.data)
     if serializer.is_valid():
         question = serializer.validated_data['question']
         
         try:
-            # Get enhanced RAG prompt with Valyu search context
+            # Get enhanced RAG prompt AND the sources used for context
+            # This ensures citations match exactly what the LLM used for context
             logger.info(f"Creating RAG-enhanced prompt for question: {question}")
-            enhanced_system_prompt = get_rag_enhanced_prompt(question, max_sources=3)
+            enhanced_system_prompt, context_sources = get_rag_enhanced_prompt_with_sources(
+                question, max_sources=3
+            )
             
-            # Get citations from search results for response
-            search_results = valyu_search(question, top_k=5)
+            # Build citations from the same sources used for LLM context
             citations = []
-            for result in search_results:
+            for result in context_sources:
                 citations.append({
                     "title": result.get('title', 'Official Source'),
                     "url": result.get('url', '#'),
@@ -175,13 +177,13 @@ def ask_question(request):
                     "snippet": "Please verify information with official government websites"
                 }]
             
-            logger.info(f"RAG-verified response generated with {len(citations)} citations")
+            logger.info(f"RAG-verified response generated with {len(citations)} citations matching LLM context sources")
             
             return Response({
                 'answer': response,
                 'citations': citations,
                 'rag_verified': True,
-                'source_count': len(search_results)
+                'source_count': len(context_sources)
             }, status=status.HTTP_200_OK)
             
         except ValyuAPIException as e:
@@ -189,14 +191,14 @@ def ask_question(request):
             logger.warning(f"Valyu API error: {str(e)}, falling back to LLM-only response")
             
             fallback_response = default_llm.call(
-                "You are a travel assistant. IMPORTANT: Always remind users to verify information with official government sources as you don't have access to real-time official data.",
+                "You are a travel assistant for the United Kingdom. IMPORTANT: Always remind users to verify information with official UK government sources as you don't have access to real-time official data.",
                 question
             )
             
             return Response({
-                'answer': f"⚠️ **Verification temporarily unavailable** - Please verify this information with official sources.\n\n{fallback_response}",
+                'answer': f"⚠️ **Verification temporarily unavailable** - Please verify this information with official UK government sources.\n\n{fallback_response}",
                 'citations': [{
-                    "title": "Please verify with official sources",
+                    "title": "Please verify with official UK sources",
                     "url": "https://gov.uk",
                     "snippet": "Real-time verification temporarily unavailable"
                 }],

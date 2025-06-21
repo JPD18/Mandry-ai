@@ -16,31 +16,71 @@ class ValyuAPIException(APIException):
 
 def extract_main_query(user_question: str) -> str:
     """
-    Extract the main search query from user's question for better RAG results
+    Extract the main search query from user's question and ensure it's UK-focused for better RAG results
     """
-    # Remove common question words and extract key terms
-    question_lower = user_question.lower().strip()
+    from services.llm_service import default_llm
     
-    # Remove common question prefixes
-    question_starters = [
-        "what is", "what are", "how do i", "how to", "can i", "do i need",
-        "tell me about", "explain", "help me with", "i need to know about"
-    ]
-    
-    for starter in question_starters:
-        if question_lower.startswith(starter):
-            question_lower = question_lower[len(starter):].strip()
-            break
-    
-    # Remove question marks and clean up
-    query = question_lower.replace("?", "").strip()
-    
-    # If query is too short, return original question
-    if len(query) < 3:
-        return user_question
-    
-    logger.info(f"Extracted query: '{query}' from original question: '{user_question}'")
-    return query
+    try:
+        # Use LLM to reformulate the query to be UK-specific
+        uk_focused_prompt = f"""Convert this user question into a UK-focused search query for finding official UK government information.
+
+        INSTRUCTIONS:
+        1. Keep the main subject and intent of the original question
+        2. Add "UK" or "United Kingdom" context where appropriate
+        3. Focus on UK government sources and UK-specific information
+        4. Make it a concise search query (not a full question)
+        5. If it's already UK-focused, improve the search terms
+        6. keep it 100 tokens max
+        Original question: "{user_question}"
+
+        Return only the UK-focused search query, nothing else."""
+
+        uk_query = default_llm.call(
+            uk_focused_prompt, 
+            "",
+            extra_params={
+                "max_tokens": 50,
+                "temperature": 0.1  # Low temperature for consistent reformulation
+            }
+        ).strip()
+        
+        # Fallback to manual processing if LLM fails or returns empty
+        if not uk_query or len(uk_query) < 5:
+            raise Exception("LLM returned empty or too short query")
+            
+        logger.info(f"LLM converted query: '{user_question}' -> '{uk_query}'")
+        return uk_query
+        
+    except Exception as e:
+        logger.warning(f"LLM query conversion failed: {str(e)}, falling back to manual processing")
+        
+        # Fallback to original logic with UK focus added
+        question_lower = user_question.lower().strip()
+        
+        # Remove common question words and extract key terms
+        question_starters = [
+            "what is", "what are", "how do i", "how to", "can i", "do i need",
+            "tell me about", "explain", "help me with", "i need to know about"
+        ]
+        
+        for starter in question_starters:
+            if question_lower.startswith(starter):
+                question_lower = question_lower[len(starter):].strip()
+                break
+        
+        # Remove question marks and clean up
+        query = question_lower.replace("?", "").strip()
+        
+        # Add UK context if not already present
+        if not any(uk_term in query for uk_term in ['uk', 'united kingdom', 'britain', 'british']):
+            query = f"UK {query}"
+        
+        # If query is too short, return original question with UK prefix
+        if len(query) < 3:
+            return f"UK {user_question}"
+        
+        logger.info(f"Manual UK-focused query: '{query}' from original question: '{user_question}'")
+        return query
 
 
 def valyu_search(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
@@ -213,28 +253,84 @@ def create_rag_context(query: str, max_sources: int = 3) -> str:
         return "Unable to retrieve verification sources at this time."
 
 
-def get_rag_enhanced_prompt(user_question: str, max_sources: int = 3) -> str:
+def get_rag_context_and_sources(user_question: str, max_sources: int = 3) -> tuple[str, List[Dict[str, Any]]]:
     """
-    Create an enhanced system prompt with RAG context
+    Create RAG context and return both the context string and the source results used
+    This ensures the same sources are used for both LLM context and frontend citations
     """
-    rag_context = create_rag_context(user_question, max_sources)
+    try:
+        # Extract the UK-focused query for better search results
+        search_query = extract_main_query(user_question)
+        
+        # Get search results from Valyu using the UK-focused query
+        search_results = valyu_search(search_query, max_sources)
+        
+        if not search_results:
+            logger.warning("No search results found, using fallback sources")
+            search_results = get_fallback_sources(user_question)
+        
+        # Format context for LLM
+        context_parts = ["OFFICIAL SOURCES CONTEXT:"]
+        
+        for i, result in enumerate(search_results, 1):
+            context_parts.append(
+                f"\nSource {i}: {result['title']}\n"
+                f"URL: {result['url']}\n"
+                f"Content: {result['snippet']}\n"
+            )
+        
+        context = "\n".join(context_parts)
+        logger.info(f"Created RAG context with {len(search_results)} sources using UK-focused query: '{search_query}'")
+        
+        return context, search_results
+        
+    except Exception as e:
+        logger.error(f"Error creating RAG context and sources: {str(e)}")
+        fallback_sources = get_fallback_sources(user_question)
+        return "Unable to retrieve verification sources at this time.", fallback_sources
+
+
+def get_rag_enhanced_prompt_with_sources(user_question: str, max_sources: int = 3) -> tuple[str, List[Dict[str, Any]]]:
+    """
+    Create an enhanced system prompt with RAG context and return the sources used
+    This replaces the old get_rag_enhanced_prompt to ensure citation consistency
+    """
+    rag_context, sources = get_rag_context_and_sources(user_question, max_sources)
     
-    enhanced_prompt = f"""You are a knowledgeable travel and visa assistant with access to official sources.
+    enhanced_prompt = f"""You are a knowledgeable travel and visa assistant for the united kingdom with access to official sources.
 
     {rag_context}
 
     INSTRUCTIONS:
     1. Base your answer primarily on the official sources provided above
-    2. Include inline citations using [Source 1], [Source 2], etc. when referencing information
-    3. If the sources don't contain enough information, clearly state this limitation
-    4. Always recommend checking the most current official government websites
-    5. Be helpful but emphasize the importance of verifying information with official sources
-    6. Provide accurate, up-to-date information based on the context provided
+    2. Use **markdown formatting** for emphasis (bold, italic, lists, etc.)
+    3. Include inline citations using [Source 1], [Source 2], etc. when referencing information
+    4. Structure your response with clear headings and bullet points where appropriate
+    5. If the sources don't contain enough information, clearly state this limitation
+    6. Always recommend checking the most current official government websites
+    7. Be helpful but emphasize the importance of verifying information with official sources
+    8. Provide accurate, up-to-date information based on the context provided
+    9. Format your response for readability with proper paragraphs and spacing
+
+    RESPONSE FORMAT:
+    - Use **bold** for important terms and requirements
+    - Use bullet points or numbered lists for step-by-step information
+    - Include [Source X] citations immediately after relevant information
+    - End with a verification reminder
 
     User Question: {user_question}
 
-    Please provide a comprehensive answer using the official sources above."""
+    Please provide a comprehensive, well-formatted answer using the official sources above."""
 
+    return enhanced_prompt, sources
+
+
+def get_rag_enhanced_prompt(user_question: str, max_sources: int = 3) -> str:
+    """
+    Create an enhanced system prompt with RAG context (backward compatibility)
+    For new code, use get_rag_enhanced_prompt_with_sources() to ensure citation consistency
+    """
+    enhanced_prompt, _ = get_rag_enhanced_prompt_with_sources(user_question, max_sources)
     return enhanced_prompt
 
 
