@@ -9,12 +9,13 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.conf import settings
-from .models import UploadedDocument, Appointment, Reminder
+
+from .models import Appointment, ActivityLog, Appointment, Reminder
+
 from .serializers import (
     FileUploadSerializer, 
     QuestionSerializer, 
     ScheduleSerializer,
-    UploadedDocumentSerializer,
     UserSignupSerializer,
     UserLoginSerializer,
     ReminderSerializer,
@@ -105,36 +106,7 @@ def login(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['POST'])
-@authentication_classes([TokenAuthentication])
-@permission_classes([IsAuthenticated])
-def upload_document(request):
-    """
-    POST /api/upload - Accept PDF/PNG/JPG files, save to media/, return file_id
-    """
-    serializer = FileUploadSerializer(data=request.data)
-    if serializer.is_valid():
-        uploaded_file = serializer.validated_data['file']
-        
-        # Check file type
-        file_extension = uploaded_file.name.split('.')[-1].lower()
-        if file_extension not in ['pdf', 'png', 'jpg', 'jpeg']:
-            return Response(
-                {'error': 'Only PDF, PNG, and JPG files are allowed'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Save document associated with the authenticated user
-        document = UploadedDocument.objects.create(
-            user=request.user,
-            file=uploaded_file,
-            filename=uploaded_file.name,
-            file_type=file_extension
-        )
-        
-        return Response({'file_id': document.id}, status=status.HTTP_201_CREATED)
-    
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 @api_view(['POST'])
@@ -414,10 +386,11 @@ def logout(request):
 def process_document(request):
     """
     POST /api/process-document - Process uploaded document without storing
-    Extracts text and validates document using LLM
+    Extracts text and validates document using LLM, logs activity without storing sensitive data
     Body: {file, document_type (optional)}
-    Returns: {is_valid, reason, extracted_text, metadata}
+    Returns: {is_valid, reason, metadata, processing_successful}
     """
+    activity_log = None
     try:
         # Check if file is provided
         if 'file' not in request.FILES:
@@ -432,6 +405,15 @@ def process_document(request):
         # Validate file type
         file_extension = uploaded_file.name.split('.')[-1].lower()
         if file_extension not in ['pdf', 'png', 'jpg', 'jpeg']:
+            # Log error activity
+            ActivityLog.objects.create(
+                user=request.user,
+                activity_type='processing_error',
+                file_type=file_extension,
+                document_type=document_type,
+                error_type='unsupported_file_type',
+                processing_successful=False
+            )
             return Response(
                 {'error': 'Only PDF, PNG, and JPG files are allowed'}, 
                 status=status.HTTP_400_BAD_REQUEST
@@ -446,12 +428,29 @@ def process_document(request):
             document_type
         )
         
-        # Return processing results
+        # Log successful processing activity (WITHOUT storing sensitive data)
+        activity_log = ActivityLog.objects.create(
+            user=request.user,
+            activity_type='document_processed',
+            file_type=file_extension,
+            document_type=document_type,
+            file_size_kb=uploaded_file.size // 1024 if hasattr(uploaded_file, 'size') else None,
+            text_length=len(result['extracted_text']),
+            validation_result='valid' if result['validation']['is_valid'] else 'invalid',
+            processing_successful=True
+        )
+        
+        # Return processing results WITHOUT extracted text or sensitive data
         response_data = {
             'is_valid': result['validation']['is_valid'],
             'reason': result['validation']['reason'],
-            'extracted_text': result['extracted_text'],
-            'metadata': result['metadata'],
+            'metadata': {
+                'file_type': result['metadata']['file_type'],
+                'document_type': result['metadata']['document_type'],
+                'text_length': result['metadata']['text_length'],
+                'processing_successful': result['metadata']['processing_successful'],
+                'activity_log_id': activity_log.id
+            },
             'processing_successful': True
         }
         
@@ -460,6 +459,16 @@ def process_document(request):
         return Response(response_data, status=status.HTTP_200_OK)
         
     except DocumentProcessingException as e:
+        # Log processing error
+        ActivityLog.objects.create(
+            user=request.user,
+            activity_type='processing_error',
+            file_type=file_extension if 'file_extension' in locals() else 'unknown',
+            document_type=document_type if 'document_type' in locals() else 'unknown',
+            validation_result='error',
+            error_type='document_processing_exception',
+            processing_successful=False
+        )
         logger.error(f"Document processing failed: {str(e)}")
         return Response(
             {
@@ -470,6 +479,16 @@ def process_document(request):
         )
     
     except Exception as e:
+        # Log unexpected error
+        ActivityLog.objects.create(
+            user=request.user,
+            activity_type='processing_error',
+            file_type=file_extension if 'file_extension' in locals() else 'unknown',
+            document_type=document_type if 'document_type' in locals() else 'unknown',
+            validation_result='error',
+            error_type='unexpected_error',
+            processing_successful=False
+        )
         logger.error(f"Unexpected error in document processing: {str(e)}")
         return Response(
             {
