@@ -237,14 +237,21 @@ Extract any new information from this message."""
         # Check if we have basic context
         has_nationality = bool(profile.nationality)
         has_intent = bool(profile.visa_intent)
-        logger.info(f"📋 Context Check - Has Nationality: {has_nationality}, Has Intent: {has_intent}")
+        has_location = bool(profile.current_location)
+        has_destination = bool(profile.destination_country)
+        has_additional_context = bool(profile.profile_context) or bool(profile.structured_data)
+        
+        logger.info(f"📋 Context Check - Nationality: {has_nationality}, Intent: {has_intent}, Location: {has_location}, Destination: {has_destination}, Additional: {has_additional_context}")
         
         # Check if this is a completely new user (empty profile)
         is_new_user = not any([profile.nationality, profile.visa_intent, profile.current_location, profile.conversation_insights])
         logger.info(f"👤 User Status - Is New User: {is_new_user}")
         
-        if has_nationality and has_intent:
-            logger.info(f"✅ COMPLETE CONTEXT - Moving to Q&A mode")
+        # Check if profile is 100% complete (all core fields + additional context)
+        profile_complete = (has_nationality and has_intent and has_location and has_destination and has_additional_context)
+        
+        if profile_complete:
+            logger.info(f"✅ PROFILE 100% COMPLETE - Moving to Q&A mode")
             profile.context_sufficient = True
             profile.save()
             try:
@@ -252,7 +259,7 @@ Extract any new information from this message."""
                 response = self._generate_welcome_message(profile, message)
             except Exception as e:
                 logger.warning(f"AI welcome generation failed: {e}")
-                response = f"Hello! I see you're {profile.nationality} interested in {profile.visa_intent}. What specific questions do you have?"
+                response = f"Perfect! I have all the information I need. What specific questions do you have about your {profile.visa_intent}?"
             next_step = "intelligent_qna"
         elif is_new_user:
             logger.info(f"🆕 NEW USER - Generating welcome message")
@@ -270,7 +277,7 @@ Extract any new information from this message."""
                 response = self._generate_initial_assessment(profile, message)
             except Exception as e:
                 logger.warning(f"AI initial assessment failed: {e}")
-                response = "Hello! I'm Mandry AI, your visa and travel assistant. I can help you with work visas, student visas, tourist visas, family visas, and more. To provide you with the best guidance, please tell me your nationality and what type of visa or travel assistance you need."
+                response = "What's your nationality and what type of visa do you need?"
             next_step = "gather_context"
         
         logger.info(f"🔚 ASSESS_CONTEXT RESULT - Next Step: {next_step}")
@@ -334,16 +341,16 @@ Generate a personalized welcome message."""
     def _generate_initial_assessment(self, profile: UserProfile, message: str) -> str:
         """Generate intelligent initial assessment and information gathering for users with partial info"""
         
-        system_prompt = """You are Mandry AI, a friendly visa and travel consultant assistant.
+        system_prompt = """You are Mandry AI, a direct visa and travel consultant assistant.
         
         The user has some profile information but it's incomplete. Generate a response that:
-        1. Acknowledges what you already know about them
-        2. Shows you understand their visa/travel inquiry
-        3. Asks for the missing information you need to provide better assistance
-        4. Emphasizes your expertise in visa and travel matters
-        5. Keeps them engaged and confident in your help
+        1. Directly asks for the missing information you need
+        2. Be specific about what information is needed (nationality, visa type, location)
+        3. Keep it very brief and to the point
+        4. No explanations about your expertise or reassurances
+        5. No mention of "from the information you've provided"
         
-        Keep it conversational and encouraging (2-3 sentences). Focus on visa/travel assistance."""
+        Keep it direct and concise (1-2 sentences maximum). Just ask for what you need."""
         
         user_prompt = f"""Current Profile Information:
 - Nationality: {profile.nationality or 'Not provided'}
@@ -374,10 +381,17 @@ Generate an appropriate response that acknowledges their partial profile and ask
         # Check if we now have sufficient context
         has_nationality = bool(profile.nationality)
         has_intent = bool(profile.visa_intent)
-        logger.info(f"📊 UPDATED CONTEXT - Has Nationality: {has_nationality}, Has Intent: {has_intent}")
+        has_location = bool(profile.current_location)
+        has_destination = bool(profile.destination_country)
+        has_additional_context = bool(profile.profile_context) or bool(profile.structured_data)
         
-        if has_nationality and has_intent:
-            logger.info(f"✅ CONTEXT NOW COMPLETE - Moving to Q&A")
+        logger.info(f"📊 UPDATED CONTEXT - Nationality: {has_nationality}, Intent: {has_intent}, Location: {has_location}, Destination: {has_destination}, Additional: {has_additional_context}")
+        
+        # Check if profile is 100% complete (all core fields + additional context)
+        profile_complete = (has_nationality and has_intent and has_location and has_destination and has_additional_context)
+        
+        if profile_complete:
+            logger.info(f"✅ PROFILE NOW 100% COMPLETE - Moving to Q&A")
             profile.context_sufficient = True
             profile.save()
             try:
@@ -385,7 +399,7 @@ Generate an appropriate response that acknowledges their partial profile and ask
                 response = self._generate_context_complete_message(profile, message, extraction_result)
             except Exception as e:
                 logger.warning(f"AI context complete message failed: {e}")
-                response = f"Great! I understand you're {profile.nationality} and interested in {profile.visa_intent}. What specific questions do you have?"
+                response = f"Perfect! I have all the information I need. What specific questions do you have about your {profile.visa_intent}?"
             next_step = "intelligent_qna"
         else:
             logger.info(f"⏳ CONTEXT STILL INCOMPLETE - Generating follow-up")
@@ -395,9 +409,18 @@ Generate an appropriate response that acknowledges their partial profile and ask
             except Exception as e:
                 logger.warning(f"AI context follow-up failed: {e}")
                 missing = []
-                if not has_nationality: missing.append("your nationality")
-                if not has_intent: missing.append("your visa goals")
-                response = f"Thanks for that information! I still need to know {' and '.join(missing)} to help you better."
+                if not has_nationality: missing.append("nationality")
+                if not has_intent: missing.append("visa type")
+                if not has_location: missing.append("current location")
+                if not has_destination: missing.append("destination country")
+                if not has_additional_context: missing.append("more details about your situation")
+                
+                if len(missing) == 1:
+                    response = f"What's your {missing[0]}?"
+                elif len(missing) == 2:
+                    response = f"What's your {missing[0]} and {missing[1]}?"
+                else:
+                    response = f"I still need: {', '.join(missing[:-1])}, and {missing[-1]}."
             next_step = "gather_context"
         
         logger.info(f"🔚 GATHER_CONTEXT RESULT - Next Step: {next_step}")
@@ -406,15 +429,15 @@ Generate an appropriate response that acknowledges their partial profile and ask
     def _generate_context_complete_message(self, profile: UserProfile, message: str, extraction_result: Dict[str, Any]) -> str:
         """Generate intelligent message when context gathering is complete"""
         
-        system_prompt = """You are Mandry AI, a visa consultant assistant. The user has provided enough basic information to start helping them.
+        system_prompt = """You are Mandry AI, a direct visa consultant assistant. The user has provided enough basic information to start helping them.
         
         Generate a response that:
-        1. Acknowledges what they've shared
-        2. Confirms your understanding of their situation
-        3. Transitions smoothly to offering specific help
-        4. Sounds natural and encouraging
+        1. Briefly confirms their situation (nationality and visa type)
+        2. Directly asks what specific questions they have
+        3. No lengthy acknowledgments or explanations
+        4. Keep it very brief and to the point
         
-        Keep it conversational and professional (2-3 sentences)."""
+        Keep it direct and concise (1-2 sentences maximum)."""
         
         user_prompt = f"""User Profile:
 - Nationality: {profile.nationality}
@@ -438,15 +461,16 @@ Generate a response confirming you understand their situation and are ready to h
     def _generate_context_follow_up(self, profile: UserProfile, message: str, extraction_result: Dict[str, Any]) -> str:
         """Generate intelligent follow-up questions for missing context"""
         
-        system_prompt = """You are Mandry AI, a visa consultant assistant gathering information from a new user.
+        system_prompt = """You are Mandry AI, a direct visa consultant assistant gathering information from a new user.
         
         Generate a response that:
-        1. Acknowledges what they've shared so far
-        2. Naturally asks for the missing information you need
-        3. Explains briefly why you need this information
-        4. Keeps them engaged and comfortable
+        1. Directly asks for the missing information you need
+        2. Be specific - ask for nationality and/or visa type directly
+        3. No acknowledgments of what they've shared
+        4. No explanations about why you need the information
+        5. No reassurances or encouraging language
         
-        Be conversational and encouraging (2-3 sentences)."""
+        Be direct and brief (1 sentence maximum)."""
         
         missing_info = []
         if not profile.nationality:
