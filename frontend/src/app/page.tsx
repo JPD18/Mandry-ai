@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Textarea } from '@/components/ui/textarea'
 import { CitationList } from '@/components/ui/citation'
 import { MarkdownRenderer } from '@/components/ui/markdown-renderer'
+import { ProfileDropdown } from '@/components/ui/profile-dropdown'
 import { AlertCircle, CheckCircle, MessageSquare, User, Settings, MessageCircle } from 'lucide-react'
 
 interface Citation {
@@ -41,6 +42,8 @@ export default function Home() {
   const [sessionState, setSessionState] = useState<any>(null)
   const [chatLoading, setChatLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [profileExpanded, setProfileExpanded] = useState(false)
+  const [profileRefreshTrigger, setProfileRefreshTrigger] = useState(0)
   const router = useRouter()
 
   useEffect(() => {
@@ -51,7 +54,8 @@ export default function Home() {
     if (token && storedUsername) {
       setIsAuthenticated(true)
       setUsername(storedUsername)
-      // Don't auto-initialize - wait for user to start
+      // Auto-initialize conversation with bot greeting
+      initializeConversation()
     } else {
       // Redirect to login if not authenticated
       router.push('/login')
@@ -59,7 +63,50 @@ export default function Home() {
     setLoading(false)
   }, [router])
 
-  // Removed auto-initialization to prevent loops
+  // Initialize conversation with bot greeting
+  const initializeConversation = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('http://localhost:8000/api/chat/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Token ${token}`,
+        },
+        body: JSON.stringify({ 
+          message: "start", // Special message to trigger initial greeting
+          session_state: null 
+        }),
+      })
+
+      const data: LangGraphResponse = await response.json()
+      
+      if (response.ok) {
+        // Filter out the "start" trigger message, keep only the bot's greeting
+        const filteredHistory = data.message_history.filter(
+          (msg: ChatMessage) => !(msg.type === 'human' && msg.content.toLowerCase().includes('hello, i\'m new here'))
+        )
+        
+        // Update chat state with initial greeting
+        setChatHistory(filteredHistory)
+        setCurrentStep(data.current_step)
+        setContextSufficient(data.context_sufficient)
+        setSessionState({
+          current_step: data.current_step,
+          context_sufficient: data.context_sufficient,
+          missing_context_areas: data.missing_context_areas,
+          session_data: data.session_data,
+          message_history: filteredHistory
+        })
+        
+        // Trigger initial profile refresh
+        setProfileRefreshTrigger(prev => prev + 1)
+      }
+    } catch (error) {
+      console.error('Failed to initialize conversation:', error)
+      // Don't show error to user for initialization failure
+    }
+  }
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -107,6 +154,9 @@ export default function Home() {
         message_history: data.message_history
       })
       setMessage('') // Clear input
+      
+      // Trigger profile refresh after bot response
+      setProfileRefreshTrigger(prev => prev + 1)
       
     } catch (error) {
       console.error('Chat Error:', error)
@@ -193,6 +243,13 @@ export default function Home() {
         </Button>
       </div>
 
+      {/* Profile Information Dropdown */}
+      <ProfileDropdown 
+        isExpanded={profileExpanded}
+        onToggle={() => setProfileExpanded(!profileExpanded)}
+        refreshTrigger={profileRefreshTrigger}
+      />
+
       {/* Status Indicator */}
       <div className="flex items-center justify-center gap-2 p-4 bg-blue-50 rounded-lg">
         {chatLoading ? <Settings className="h-5 w-5 animate-spin" /> : getStepIcon()}
@@ -236,7 +293,7 @@ export default function Home() {
             ) : (
               <div className="text-center text-gray-500">
                 <MessageCircle className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>Start a conversation to begin your visa consultation</p>
+                <p>Mandry AI is preparing your personalized welcome message...</p>
               </div>
             )}
             
@@ -260,6 +317,8 @@ export default function Home() {
                 placeholder={
                   currentStep === 'gather_context' 
                     ? "Tell me your nationality and visa type..."
+                    : currentStep === 'assess_context'
+                    ? "Respond to my welcome message above..."
                     : "Ask me anything about your visa application..."
                 }
                 value={message}

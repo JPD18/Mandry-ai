@@ -221,26 +221,63 @@ Extract any new information from this message."""
         has_nationality = bool(profile.nationality)
         has_intent = bool(profile.visa_intent)
         
+        # Check if this is a completely new user (empty profile)
+        is_new_user = not any([profile.nationality, profile.visa_intent, profile.current_location, profile.conversation_insights])
+        
         if has_nationality and has_intent:
             profile.context_sufficient = True
             profile.save()
             try:
-                # Generate personalized welcome message
+                # Generate personalized welcome message for returning users
                 response = self._generate_welcome_message(profile, message)
             except Exception as e:
                 logger.warning(f"AI welcome generation failed: {e}")
                 response = f"Hello! I see you're {profile.nationality} interested in {profile.visa_intent}. What specific questions do you have?"
             next_step = "intelligent_qna"
+        elif is_new_user:
+            try:
+                # Generate visa-focused welcome message for brand new users
+                response = self._generate_new_user_welcome(message)
+            except Exception as e:
+                logger.warning(f"AI new user welcome failed: {e}")
+                response = "Welcome to Mandry AI! 🌍 I'm your personal visa and travel assistant. Whether you're planning to work, study, visit family, or explore new destinations, I'm here to guide you through the visa process. What kind of travel or visa assistance can I help you with today?"
+            next_step = "gather_context"
         else:
             try:
-                # Generate intelligent initial assessment
+                # Generate intelligent initial assessment for users with partial info
                 response = self._generate_initial_assessment(profile, message)
             except Exception as e:
                 logger.warning(f"AI initial assessment failed: {e}")
-                response = "Hello! I'm your visa assistant. To get started, please tell me your nationality and what type of visa you're interested in."
+                response = "Hello! I'm Mandry AI, your visa and travel assistant. I can help you with work visas, student visas, tourist visas, family visas, and more. To provide you with the best guidance, please tell me your nationality and what type of visa or travel assistance you need."
             next_step = "gather_context"
         
         return response, next_step
+    
+    def _generate_new_user_welcome(self, message: str) -> str:
+        """Generate visa-focused welcome message for brand new users"""
+        
+        system_prompt = """You are Mandry AI, a friendly and professional visa and travel consultant assistant.
+        
+        Generate a warm welcome message for a first-time user that:
+        1. Welcomes them to Mandry AI
+        2. Clearly explains you specialize in visa and travel assistance
+        3. Mentions the types of visa/travel help you provide (work, study, tourism, family, business visas)
+        4. Asks what specific visa or travel assistance they need
+        5. Uses an encouraging, professional tone with appropriate emojis
+        
+        Keep it engaging but concise (2-3 sentences). Make it clear this is specifically for visa/travel help."""
+        
+        user_prompt = f"""User's first message: "{message}"
+
+Generate a welcoming message that introduces Mandry AI as a visa and travel assistant and asks what kind of visa/travel help they need."""
+        
+        response = anthropic_llm.call(
+            system_prompt=system_prompt,
+            user_message=user_prompt,
+            extra_params={"max_tokens": 200, "temperature": 0.8}
+        )
+        
+        return response
     
     def _generate_welcome_message(self, profile: UserProfile, message: str) -> str:
         """Generate personalized welcome message for users with complete context"""
@@ -269,26 +306,27 @@ Generate a personalized welcome message."""
         return response
     
     def _generate_initial_assessment(self, profile: UserProfile, message: str) -> str:
-        """Generate intelligent initial assessment and information gathering"""
+        """Generate intelligent initial assessment and information gathering for users with partial info"""
         
-        system_prompt = """You are Mandry AI, a friendly visa consultant assistant meeting a new user.
+        system_prompt = """You are Mandry AI, a friendly visa and travel consultant assistant.
         
-        Analyze their first message and generate an appropriate response that:
-        1. Welcomes them warmly
-        2. Shows you understand their initial inquiry 
-        3. Asks for the specific information you need to help them
-        4. Makes them feel comfortable and confident in your expertise
+        The user has some profile information but it's incomplete. Generate a response that:
+        1. Acknowledges what you already know about them
+        2. Shows you understand their visa/travel inquiry
+        3. Asks for the missing information you need to provide better assistance
+        4. Emphasizes your expertise in visa and travel matters
+        5. Keeps them engaged and confident in your help
         
-        Keep it conversational and encouraging (2-3 sentences)."""
+        Keep it conversational and encouraging (2-3 sentences). Focus on visa/travel assistance."""
         
         user_prompt = f"""Current Profile Information:
-- Nationality: {profile.nationality or 'Unknown'}
-- Visa Interest: {profile.visa_intent or 'Unknown'}
-- Location: {profile.current_location or 'Unknown'}
+- Nationality: {profile.nationality or 'Not provided'}
+- Visa Interest: {profile.visa_intent or 'Not provided'}
+- Current Location: {profile.current_location or 'Not provided'}
 
-User's first message: "{message}"
+User's message: "{message}"
 
-Generate an appropriate welcome and information-gathering response."""
+Generate an appropriate response that acknowledges their partial profile and asks for missing visa/travel information."""
         
         response = anthropic_llm.call(
             system_prompt=system_prompt,

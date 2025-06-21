@@ -308,6 +308,11 @@ def langgraph_chat(request):
         session_state = serializer.validated_data.get('session_state')
         
         try:
+            # Handle special "start" message for initial bot greeting
+            if message.lower() == "start":
+                # Convert to a more natural initial message that triggers greeting
+                message = "Hello, I'm new here and need help with visa information."
+            
             # Process message through LangGraph workflow
             result = visa_assistant_workflow.process_message(
                 user_id=request.user.id,

@@ -10,6 +10,7 @@ class UserProfile(models.Model):
     # Core context - what we always try to understand first
     nationality = models.CharField(max_length=100, blank=True, help_text="User's nationality/citizenship")
     current_location = models.CharField(max_length=100, blank=True, help_text="Where user currently lives")
+    destination_country = models.CharField(max_length=100, blank=True, help_text="Country user wants to visit/move to")
     visa_intent = models.TextField(blank=True, help_text="What user wants to do (travel, work, study, etc.)")
     
     # Structured data that emerges from conversation
@@ -40,6 +41,8 @@ class UserProfile(models.Model):
             context_parts.append(f"Nationality: {self.nationality}")
         if self.current_location:
             context_parts.append(f"Currently in: {self.current_location}")
+        if self.destination_country:
+            context_parts.append(f"Destination: {self.destination_country}")
         if self.visa_intent:
             context_parts.append(f"Intent: {self.visa_intent}")
         

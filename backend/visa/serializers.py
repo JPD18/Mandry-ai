@@ -22,7 +22,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         fields = [
-            'id', 'nationality', 'current_location', 'visa_intent',
+            'id', 'nationality', 'current_location', 'destination_country', 'visa_intent',
             'structured_data', 'profile_context', 'conversation_insights',
             'missing_context', 'context_sufficient', 'context_completeness',
             'core_context', 'context_summary', 'created_at', 'updated_at'
