@@ -24,11 +24,27 @@ interface Message {
   }>
 }
 
+interface ProcessedDocument {
+  id: string
+  name: string
+  size: number
+  status: 'uploading' | 'processing' | 'completed' | 'error'
+  isValid?: boolean
+  reason?: string
+  metadata?: {
+    file_type: string
+    document_type: string
+    text_length: number
+    activity_log_id: number
+  }
+  error?: string
+}
+
 function ChatPageContent() {
   const [message, setMessage] = useState("")
   const [messages, setMessages] = useState<Message[]>([])
   const [completionPercentage, setCompletionPercentage] = useState(75)
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const [processedDocuments, setProcessedDocuments] = useState<ProcessedDocument[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -92,24 +108,39 @@ function ChatPageContent() {
     const files = event.target.files
     if (files) {
       const newFiles = Array.from(files)
-      setUploadedFiles((prev) => [...prev, ...newFiles])
 
       // Upload files to backend
       for (const file of newFiles) {
-        await uploadFileToBackend(file)
+        await processDocument(file)
       }
     }
   }
 
-  const uploadFileToBackend = async (file: File) => {
+  const processDocument = async (file: File) => {
+    const docId = Date.now().toString()
+    
+    // Add document with uploading status
+    setProcessedDocuments(prev => [...prev, {
+      id: docId,
+      name: file.name,
+      size: file.size,
+      status: 'uploading' as const,
+    }])
+
     try {
       const token = localStorage.getItem("token")
       const apiBase = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000"
       
       const formData = new FormData()
       formData.append("file", file)
+      formData.append("document_type", "document")
 
-      const response = await fetch(`${apiBase}/api/upload/`, {
+      // Update to processing status
+      setProcessedDocuments(prev => prev.map(doc => 
+        doc.id === docId ? { ...doc, status: 'processing' as const } : doc
+      ))
+
+      const response = await fetch(`${apiBase}/api/process-document/`, {
         method: "POST",
         headers: {
           Authorization: `Token ${token}`,
@@ -119,12 +150,44 @@ function ChatPageContent() {
 
       if (response.ok) {
         const data = await response.json()
-        console.log("File uploaded successfully:", data)
+        
+        // Update with completed status and results
+        setProcessedDocuments(prev => prev.map(doc => 
+          doc.id === docId ? { 
+            ...doc, 
+            status: 'completed' as const,
+            isValid: data.is_valid,
+            reason: data.reason,
+            metadata: data.metadata
+          } : doc
+        ))
+        
+        console.log("Document processed successfully:", data)
       } else {
-        console.error("Failed to upload file:", file.name)
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        
+        // Update with error status
+        setProcessedDocuments(prev => prev.map(doc => 
+          doc.id === docId ? { 
+            ...doc, 
+            status: 'error' as const,
+            error: errorData.error || 'Processing failed'
+          } : doc
+        ))
+        
+        console.error("Failed to process document:", file.name, errorData)
       }
     } catch (error) {
-      console.error("Error uploading file:", error)
+      // Update with error status
+      setProcessedDocuments(prev => prev.map(doc => 
+        doc.id === docId ? { 
+          ...doc, 
+          status: 'error' as const,
+          error: error instanceof Error ? error.message : 'Network error'
+        } : doc
+      ))
+      
+      console.error("Error processing document:", error)
     }
   }
 
@@ -324,75 +387,136 @@ function ChatPageContent() {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6 }}
-            className="w-80 bg-transparent backdrop-blur-sm border-l border-white/10 p-6 flex flex-col"
+            className="w-80 bg-transparent backdrop-blur-sm border-l border-white/10 flex flex-col"
           >
-            <div className="mb-6">
-              <h3 className="font-semibold text-white mb-3 misto-font">Upload Documents</h3>
-              <p className="text-sm text-gray-300 leading-relaxed">Supported formats: PDF, PNG, JPG (max 10MB)</p>
-            </div>
-
-            {/* Upload Area */}
-            <div className="mb-4">
-              <div className="bg-transparent backdrop-blur-sm border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-[#FFF309]/50 transition-colors duration-200">
-                <Upload className="w-8 h-8 text-[#FFF309] mx-auto mb-3" />
-                <p className="text-sm text-gray-300 mb-4">
-                  Drag and drop your file here or click the button below to select a file
-                </p>
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="mb-6">
+                <h3 className="font-semibold text-white mb-3 misto-font">Upload Documents</h3>
+                <p className="text-sm text-gray-300 leading-relaxed">Supported formats: PDF, PNG, JPG (max 10MB)</p>
               </div>
-              <div className="flex justify-center">
-                <Button
-                  size="sm"
-                  onClick={handleUploadClick}
-                  className="w-full mt-3 bg-[#FFF309]/20 hover:bg-[#FFF309] hover:text-slate-900 text-[#FFF309] border-none font-medium rounded-lg transition-all duration-200"
-                >
-                  Select File
-                </Button>
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                onChange={handleFileUpload}
-                className="hidden"
-                accept=".pdf,.png,.jpg,.jpeg"
-              />
-            </div>
 
-            {/* Uploaded Files List */}
-            {uploadedFiles.length > 0 && (
-              <div className="space-y-3 mb-6">
-                <h4 className="font-medium text-gray-300 text-sm">Uploaded Files:</h4>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {uploadedFiles.map((file, index) => (
-                    <motion.div
+              {/* Upload Area */}
+              <div className="mb-4">
+                <div className="bg-transparent backdrop-blur-sm border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-[#FFF309]/50 transition-colors duration-200">
+                  <Upload className="w-8 h-8 text-[#FFF309] mx-auto mb-3" />
+                  <p className="text-sm text-gray-300 mb-4">
+                    Drag and drop your file here or click the button below to select a file
+                  </p>
+                </div>
+                <div className="flex justify-center">
+                  <Button
+                    size="sm"
+                    onClick={handleUploadClick}
+                    className="w-full mt-3 bg-[#FFF309]/20 hover:bg-[#FFF309] hover:text-slate-900 text-[#FFF309] border-none font-medium rounded-lg transition-all duration-200"
+                  >
+                    Select File
+                  </Button>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  accept=".pdf,.png,.jpg,.jpeg"
+                />
+              </div>
+
+              {/* Uploaded Files List */}
+              {processedDocuments.length > 0 && (
+                <div className="space-y-3 mb-6">
+                  <h4 className="font-medium text-gray-300 text-sm">Document Processing:</h4>
+                  <div className="space-y-2">
+                    {processedDocuments.map((doc, index) => (
+                      <motion.div
+                        key={doc.id}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: index * 0.1, duration: 0.3 }}
+                        className={`bg-transparent backdrop-blur-sm p-3 rounded-lg border ${
+                          doc.status === 'completed' && doc.isValid 
+                            ? 'border-green-400/50' 
+                            : doc.status === 'error' || (doc.status === 'completed' && !doc.isValid)
+                            ? 'border-red-400/50'
+                            : 'border-white/20'
+                        }`}
+                      >
+                        <div className="font-medium text-white text-sm truncate">{doc.name}</div>
+                        <div className="text-gray-400 text-xs">{(doc.size / 1024).toFixed(1)} KB</div>
+                        
+                        {/* Status indicator */}
+                        <div className="flex items-center gap-2 mt-2">
+                          {doc.status === 'uploading' && (
+                            <>
+                              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                              <span className="text-xs text-blue-300">Uploading...</span>
+                            </>
+                          )}
+                          {doc.status === 'processing' && (
+                            <>
+                              <div className="w-2 h-2 bg-yellow-400 rounded-full animate-spin"></div>
+                              <span className="text-xs text-yellow-300">Processing...</span>
+                            </>
+                          )}
+                          {doc.status === 'completed' && doc.isValid && (
+                            <>
+                              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                              <span className="text-xs text-green-300">Valid Document</span>
+                            </>
+                          )}
+                          {doc.status === 'completed' && !doc.isValid && (
+                            <>
+                              <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                              <span className="text-xs text-red-300">Invalid Document</span>
+                            </>
+                          )}
+                          {doc.status === 'error' && (
+                            <>
+                              <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                              <span className="text-xs text-red-300">Error</span>
+                            </>
+                          )}
+                        </div>
+                        
+                        {/* Validation reason or error */}
+                        {doc.reason && (
+                          <div className="text-xs text-gray-400 mt-1 italic">
+                            {doc.reason}
+                          </div>
+                        )}
+                        {doc.error && (
+                          <div className="text-xs text-red-400 mt-1 italic">
+                            {doc.error}
+                          </div>
+                        )}
+                        
+                        {/* Metadata */}
+                        {doc.metadata && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {doc.metadata.text_length} characters extracted
+                          </div>
+                        )}
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Actions */}
+              <div className="pt-6 border-t border-white/10">
+                <h4 className="font-medium text-gray-300 text-sm mb-3">Quick Actions</h4>
+                <div className="space-y-2">
+                  {["Analyze Document", "Summarize Content", "Extract Key Points"].map((action, index) => (
+                    <motion.button
                       key={index}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: index * 0.1, duration: 0.3 }}
-                      className="bg-transparent backdrop-blur-sm p-3 rounded-lg border border-white/20"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors duration-200"
                     >
-                      <div className="font-medium text-white text-sm truncate">{file.name}</div>
-                      <div className="text-gray-400 text-xs">{(file.size / 1024).toFixed(1)} KB</div>
-                    </motion.div>
+                      {action}
+                    </motion.button>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* Quick Actions */}
-            <div className="mt-auto pt-6 border-t border-white/10">
-              <h4 className="font-medium text-gray-300 text-sm mb-3">Quick Actions</h4>
-              <div className="space-y-2">
-                {["Analyze Document", "Summarize Content", "Extract Key Points"].map((action, index) => (
-                  <motion.button
-                    key={index}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors duration-200"
-                  >
-                    {action}
-                  </motion.button>
-                ))}
               </div>
             </div>
           </motion.div>
