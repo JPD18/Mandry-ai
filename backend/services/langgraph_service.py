@@ -14,6 +14,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from visa.models import UserProfile
 from .anthropic_service import anthropic_llm
+from services.search_service import default_search_service
 
 logger = logging.getLogger(__name__)
 
@@ -283,6 +284,8 @@ Focus on capturing any additional context that would help understand their visa 
                 response, next_step = self._handle_assess_context(user, profile, message)
             elif current_step == "gather_context":
                 response, next_step = self._handle_gather_context(user, profile, message, previous_question)
+            elif current_step == "provide_initial_info":
+                response, next_step = self._handle_provide_initial_info(user, profile, message)
             elif current_step == "intelligent_qna":
                 response, next_step = self._handle_qna(user, profile, message)
             else:
@@ -448,16 +451,10 @@ Generate an appropriate response that acknowledges their partial profile and ask
         profile_complete = (has_nationality and has_intent and has_location and has_destination and has_additional_context)
         
         if profile_complete:
-            logger.info(f"✅ PROFILE NOW 100% COMPLETE - Moving to Q&A")
+            logger.info(f"✅ PROFILE NOW 100% COMPLETE - Passing to initial info provider.")
             profile.context_sufficient = True
             profile.save()
-            try:
-                # Generate intelligent transition to Q&A
-                response = self._generate_context_complete_message(profile, message, extraction_result)
-            except Exception as e:
-                logger.warning(f"AI context complete message failed: {e}")
-                response = f"Perfect! I have all the information I need. What specific questions do you have about your {profile.visa_intent}?"
-            next_step = "intelligent_qna"
+            return self._handle_provide_initial_info(user, profile, message)
         else:
             logger.info(f"⏳ CONTEXT STILL INCOMPLETE - Generating follow-up")
             try:
@@ -482,6 +479,63 @@ Generate an appropriate response that acknowledges their partial profile and ask
         
         logger.info(f"🔚 GATHER_CONTEXT RESULT - Next Step: {next_step}")
         return response, next_step
+    
+    def _handle_provide_initial_info(self, user: User, profile: UserProfile, message: str) -> tuple[str, str]:
+        """
+        Proactively provides initial visa information based on the completed profile.
+        This is triggered automatically when context is complete.
+        """
+        logger.info(f"⚡️ PROVIDE_INITIAL_INFO HANDLER - User: {user.username}")
+        
+        # 1. Create a search query from the profile.
+        query_parts = [
+            f"General visa requirements and required documents for a {profile.nationality} citizen",
+            f"applying for a {profile.visa_intent}",
+            f"to {profile.destination_country}",
+        ]
+        if profile.current_location:
+            query_parts.append(f"from {profile.current_location}")
+        
+        search_query = " ".join(query_parts)
+        
+        # The user's last message might also be relevant.
+        if message.lower() not in ["ok", "yes", "continue", "sounds good", "i see"]:
+            search_query += f". Specific user interest: {message}"
+        
+        logger.info(f"🔍 Constructed search query for initial info: {search_query}")
+        
+        # 2. Use search_service to get RAG context.
+        try:
+            rag_prompt, sources = default_search_service.get_rag_enhanced_prompt_with_sources(
+                user_question=search_query,
+                max_sources=3
+            )
+        except Exception as e:
+            logger.error(f"RAG search failed in initial info provider: {e}")
+            # Fallback to normal Q&A
+            return self._handle_qna(user, profile, "Tell me about my visa options.")
+
+        # 3. Use LLM to generate a summary.
+        try:
+            logger.info("🤖 Generating initial info summary with RAG context...")
+            response = anthropic_llm.call(
+                system_prompt=rag_prompt, # This is a full prompt with context and instructions
+                user_message="", # The user question is already in the rag_prompt
+                extra_params={"max_tokens": 600, "temperature": 0.5}
+            )
+            
+            # Add a concluding question.
+            response += "\n\nWhat specific questions do you have about this process?"
+            
+            logger.info(f"✅ Initial info summary generated. Length: {len(response)}")
+            
+            return response, "intelligent_qna"
+        
+        except Exception as e:
+            logger.error(f"LLM call failed for initial info summary: {e}")
+            # Fallback to a simpler Q&A path if generation fails
+            fallback_qna_prompt = "Great, I have your completed profile. What specific questions do you have about your visa process?"
+            return self._handle_qna(user, profile, fallback_qna_prompt)
     
     def _generate_context_complete_message(self, profile: UserProfile, message: str, extraction_result: Dict[str, Any]) -> str:
         """Generate intelligent message when context gathering is complete"""
@@ -612,31 +666,22 @@ Ask for the specific missing information. Do not repeat questions about informat
         
         context_str = "\n".join(context_info) if context_info else "Limited profile information available"
         
-        system_prompt = """You are Mandry AI, an expert visa consultant assistant. You provide helpful, accurate, and personalized visa guidance.
+        # Use RAG to get an enhanced prompt
+        enhanced_prompt, sources = default_search_service.get_rag_enhanced_prompt_with_sources(
+            user_question=user_question,
+            max_sources=3
+        )
 
-Guidelines for responses:
-1. Be conversational and empathetic
-2. Provide specific, actionable advice when possible
-3. Always mention that official sources should be consulted for final decisions
-4. If you don't have enough information, ask clarifying questions
-5. Keep responses concise but informative (2-4 sentences)
-6. Use the user's profile context to personalize your advice
-7. Be encouraging and supportive throughout the visa process
-8. Reference previous conversation topics when relevant
-9. Provide step-by-step guidance when appropriate
+        # We can augment the RAG prompt with our detailed profile context
+        final_prompt = f"""{enhanced_prompt}
 
-Important: Always remind users to verify information with official government sources or qualified immigration lawyers for their specific situation."""
-
-        user_prompt = f"""User Profile Context:
+Here is some additional user profile information to further personalize the response:
 {context_str}
-
-User's Current Question: "{user_question}"
-
-Provide a helpful, personalized response addressing their question. Use their profile context to give specific advice. If you need more information to give better advice, ask specific follow-up questions."""
+"""
 
         response = anthropic_llm.call(
-            system_prompt=system_prompt,
-            user_message=user_prompt,
+            system_prompt=final_prompt,
+            user_message="", # User question is already in the enhanced_prompt
             extra_params={"max_tokens": 400, "temperature": 0.7}
         )
         
