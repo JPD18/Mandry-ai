@@ -5,11 +5,17 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.views.static import serve
 from django.views.generic import TemplateView
+from django.http import HttpResponse
 import os
+
+def favicon_view(request):
+    """Return empty response for favicon to prevent 404 errors"""
+    return HttpResponse(status=204)  # No Content
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('visa.urls')),
+    path('favicon.ico', favicon_view, name='favicon'),
 ]
 
 # Serve static and media files
