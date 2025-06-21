@@ -5,14 +5,32 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
+import { CitationList } from '@/components/ui/citation'
+import { MarkdownRenderer } from '@/components/ui/markdown-renderer'
+import { AlertCircle, CheckCircle, MessageSquare } from 'lucide-react'
+
+interface Citation {
+  title: string
+  url: string
+  snippet: string
+}
+
+interface ApiResponse {
+  answer: string
+  citations?: Citation[]
+  rag_verified?: boolean
+  source_count?: number
+  error?: string
+}
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
   const [username, setUsername] = useState('')
   const [question, setQuestion] = useState('')
-  const [answer, setAnswer] = useState('')
+  const [response, setResponse] = useState<ApiResponse | null>(null)
   const [askLoading, setAskLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -42,9 +60,12 @@ export default function Home() {
     if (!question.trim()) return
 
     setAskLoading(true)
+    setError(null)
+    setResponse(null)
+    
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch('http://localhost:8000/api/ask/', {
+      const apiResponse = await fetch('http://localhost:8000/api/ask/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -53,10 +74,16 @@ export default function Home() {
         body: JSON.stringify({ question }),
       })
 
-      const data = await response.json()
-      setAnswer(data.answer || 'No response received')
+      const data: ApiResponse = await apiResponse.json()
+      
+      if (!apiResponse.ok) {
+        throw new Error(data.error || 'Failed to get response from server')
+      }
+      
+      setResponse(data)
     } catch (error) {
-      setAnswer('Error: Could not get response from server')
+      console.error('API Error:', error)
+      setError(error instanceof Error ? error.message : 'Error: Could not get response from server')
     } finally {
       setAskLoading(false)
     }
@@ -96,9 +123,12 @@ export default function Home() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Ask a Question</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="h-5 w-5" />
+            Ask a Question
+          </CardTitle>
           <CardDescription>
-            Get AI-powered assistance with your visa and immigration questions
+            Get AI-powered assistance with your visa and immigration questions, backed by official sources
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -118,10 +148,58 @@ export default function Home() {
             </Button>
           </form>
 
-          {answer && (
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <h3 className="font-semibold mb-2">Answer:</h3>
-              <p className="text-gray-700">{answer}</p>
+          {/* Error Display */}
+          {error && (
+            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-semibold text-red-800 mb-1">Error</h3>
+                <p className="text-red-700 text-sm">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Response Display */}
+          {response && (
+            <div className="mt-6 space-y-4">
+              {/* Status Indicator */}
+              <div className="flex items-center gap-2 text-sm">
+                {response.rag_verified ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span className="text-green-700 font-medium">
+                      Verified with {response.source_count || 0} official sources
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-4 w-4 text-amber-500" />
+                    <span className="text-amber-700 font-medium">
+                      Verification temporarily unavailable
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {/* Answer Section */}
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Answer:
+                </h3>
+                <MarkdownRenderer 
+                  content={response.answer} 
+                  className="text-gray-800"
+                />
+              </div>
+
+              {/* Citations Section */}
+              {response.citations && response.citations.length > 0 && (
+                <CitationList 
+                  citations={response.citations} 
+                  ragVerified={response.rag_verified}
+                />
+              )}
             </div>
           )}
         </CardContent>
