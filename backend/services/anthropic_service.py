@@ -80,18 +80,29 @@ class AnthropicLLMService:
                 
         else:
             # Legacy 2-string interface
+            
+            # Handle cases where user_message is None but system_prompt is present
+            final_user_message = user_message
+            final_system_prompt = system_prompt
+            
+            if not final_user_message and final_system_prompt:
+                # Anthropic requires a user message to process a system prompt.
+                # If no user message is given, we can treat the system prompt as the first user message.
+                final_user_message = final_system_prompt
+                final_system_prompt = None
+
             payload = {
                 "model": self.model,
                 "max_tokens": extra_params.get("max_tokens", 1000),
                 "temperature": extra_params.get("temperature", 0.7),
                 "messages": [
-                    {"role": "user", "content": user_message or ""}
+                    {"role": "user", "content": final_user_message or ""}
                 ]
             }
             
-            # Add system prompt if provided
-            if system_prompt:
-                payload["system"] = system_prompt
+            # Add system prompt if it exists
+            if final_system_prompt:
+                payload["system"] = final_system_prompt
             
             # Override with any extra params (but preserve messages structure)
             for key, value in extra_params.items():

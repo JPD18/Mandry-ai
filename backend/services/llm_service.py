@@ -4,6 +4,8 @@ import logging
 import requests
 from typing import List, Dict, Any, Union, Optional
 
+from services.anthropic_service import AnthropicLLMService
+
 logger = logging.getLogger(__name__)
 
 class LLMService:
@@ -103,4 +105,4 @@ class LLMService:
             raise
 
 # you can export a singleton for convenience
-default_llm = LLMService() 
+default_llm = AnthropicLLMService() 

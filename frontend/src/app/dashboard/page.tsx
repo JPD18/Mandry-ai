@@ -2,16 +2,17 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Navbar } from "@/components/Navbar"
 import { MandryStarIcon } from "@/components/mandry-icon"
-import { Upload, Send } from "lucide-react"
+import { Upload, Send, User, FileText } from "lucide-react"
 import { ChatInput } from "@/components/ui/chat-input"
 import { Button } from "@/components/ui/button"
 import { ChatAuthGuard } from "@/components/chat-auth-guard"
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
 import { CitationList } from "@/components/ui/citation"
+import { ProfileDropdown } from "@/components/ui/profile-dropdown"
 
 interface Message {
   id: string
@@ -22,6 +23,12 @@ interface Message {
     url: string
     snippet: string
   }>
+}
+
+interface SessionState {
+  current_step: string;
+  message_history: Message[];
+  last_question?: string;
 }
 
 interface ProcessedDocument {
@@ -47,13 +54,66 @@ function ChatPageContent() {
   const [processedDocuments, setProcessedDocuments] = useState<ProcessedDocument[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const conversationStarted = useRef(false);
+  const [sessionState, setSessionState] = useState<SessionState | null>(null);
+  const [refreshProfileTrigger, setRefreshProfileTrigger] = useState(0);
+  const [rightSidebarView, setRightSidebarView] = useState<'upload' | 'profile'>('upload');
+
+  const startConversation = async () => {
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+      
+      const response = await fetch(`${apiBase}/api/chat/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Token ${token}`,
+        },
+        body: JSON.stringify({ message: "start", session_state: null }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.response,
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        setSessionState(data.session_state);
+        if (data.context_sufficient || data.current_step === "intelligent_qna") {
+          setRefreshProfileTrigger(prev => prev + 1);
+        }
+      } else {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "I'm sorry, I couldn't process your request. Please try again or check your authentication.",
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      }
+    } catch (error) {
+      console.error("Error starting conversation:", error);
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "I'm sorry, there was an error connecting to the server. Please check your internet connection and try again.",
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSendMessage = async () => {
-    if (message.trim() && !isLoading) {
+    const messageToSend = message;
+    if (messageToSend.trim() && !isLoading) {
       const userMessage: Message = {
         id: Date.now().toString(),
         role: "user",
-        content: message,
+        content: messageToSend,
       }
       setMessages((prev) => [...prev, userMessage])
       setMessage("")
@@ -63,13 +123,13 @@ function ChatPageContent() {
         const token = localStorage.getItem("token")
         const apiBase = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000"
         
-        const response = await fetch(`${apiBase}/api/ask/`, {
+        const response = await fetch(`${apiBase}/api/chat/`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Token ${token}`,
           },
-          body: JSON.stringify({ question: message }),
+          body: JSON.stringify({ message: messageToSend, session_state: sessionState }),
         })
 
         if (response.ok) {
@@ -77,10 +137,14 @@ function ChatPageContent() {
           const assistantMessage: Message = {
             id: (Date.now() + 1).toString(),
             role: "assistant",
-            content: data.answer,
-            citations: data.citations,
+            content: data.response,
           }
           setMessages((prev) => [...prev, assistantMessage])
+          setSessionState(data.session_state);
+          // If context is now sufficient, trigger a profile refresh
+          if (data.context_sufficient || data.current_step === "intelligent_qna") {
+            setRefreshProfileTrigger(prev => prev + 1);
+          }
         } else {
           // Handle error response
           const assistantMessage: Message = {
@@ -103,6 +167,14 @@ function ChatPageContent() {
       }
     }
   }
+
+  useEffect(() => {
+    // Start the conversation when the component mounts, but only once.
+    if (!conversationStarted.current) {
+      startConversation();
+      conversationStarted.current = true;
+    }
+  }, []);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
@@ -246,18 +318,17 @@ function ChatPageContent() {
               </div>
             </div>
           </div>
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            className="backdrop-blur-sm px-6 py-2 rounded-full font-medium border shadow-lg"
-            style={{
-              backgroundColor: "#15AD27",
-              color: "#FFFFFF",
-              borderColor: "#15AD27",
-              boxShadow: "0 10px 15px -3px rgba(21, 173, 39, 0.25)",
-            }}
-          >
-            Completion {completionPercentage}%
-          </motion.div>
+          <div className="flex items-center space-x-3 text-white">
+            <div className="relative w-32 h-2 bg-gray-600 rounded-full">
+              <motion.div
+                className="absolute top-0 left-0 h-2 bg-green-400 rounded-full"
+                initial={{ width: "0%" }}
+                animate={{ width: `${completionPercentage}%` }}
+                transition={{ duration: 1, ease: "easeOut" }}
+              ></motion.div>
+            </div>
+            <span className="text-sm">{completionPercentage}% context</span>
+          </div>
         </motion.div>
 
         {/* Main Content */}
@@ -333,7 +404,7 @@ function ChatPageContent() {
                       className="flex justify-start"
                     >
                       <div className="w-8 h-8 rounded-full mr-3 mt-1 flex-shrink-0 border"
-                        style={{
+                         style={{
                           backgroundColor: "#31B8E9",
                           opacity: 0.4,
                           backdropFilter: "blur(12px)",
@@ -370,11 +441,16 @@ function ChatPageContent() {
                   placeholder="Ask Mandry"
                   className="flex-1 backdrop-blur-sm border-white/20 rounded-xl px-6 py-4 focus:border-[#FFF309]/50 focus:ring-[#FFF309]/20 text-white placeholder:text-gray-300"
                   style={{ background: 'transparent' }}
-                  onKeyPress={(e) => e.key === "Enter" && !isLoading && handleSendMessage()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
                   disabled={isLoading}
                 />
                 <Button
-                  onClick={handleSendMessage}
+                  onClick={() => handleSendMessage()}
                   disabled={isLoading}
                   className="px-4 py-4 bg-gradient-to-r from-[#FFF309] to-[#FFF309]/80 hover:from-[#FFF309]/90 hover:to-[#FFF309]/70 font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-[#FFF309]/25 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -384,142 +460,177 @@ function ChatPageContent() {
             </motion.div>
           </div>
 
-          {/* Right Sidebar - Document Upload */}
+          {/* Right Sidebar - Document Upload & Profile */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6 }}
             className="w-80 bg-transparent backdrop-blur-sm border-l border-white/10 flex flex-col"
           >
+            <div className="p-4 border-b border-white/10">
+              <div className="flex items-center justify-center gap-2">
+                <Button
+                  size="sm"
+                  variant={rightSidebarView === 'upload' ? 'secondary' : 'ghost'}
+                  onClick={() => setRightSidebarView('upload')}
+                  className="w-full"
+                >
+                  <FileText className="h-4 w-4 mr-2"/>
+                  Upload
+                </Button>
+                <Button
+                  size="sm"
+                  variant={rightSidebarView === 'profile' ? 'secondary' : 'ghost'}
+                  onClick={() => setRightSidebarView('profile')}
+                  className="w-full"
+                >
+                  <User className="h-4 w-4 mr-2"/>
+                  Profile
+                </Button>
+              </div>
+            </div>
+
             <div className="p-6 overflow-y-auto flex-1">
-              <div className="mb-6">
-                <h3 className="font-semibold text-white mb-3 misto-font">Upload Documents</h3>
-                <p className="text-sm text-gray-300 leading-relaxed">Supported formats: PDF, PNG, JPG (max 10MB)</p>
-              </div>
-
-              {/* Upload Area */}
-              <div className="mb-4">
-                <div className="bg-transparent backdrop-blur-sm border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-[#FFF309]/50 transition-colors duration-200">
-                  <Upload className="w-8 h-8 text-[#FFF309] mx-auto mb-3" />
-                  <p className="text-sm text-gray-300 mb-4">
-                    Drag and drop your file here or click the button below to select a file
-                  </p>
-                </div>
-                <div className="flex justify-center">
-                  <Button
-                    size="sm"
-                    onClick={handleUploadClick}
-                    className="w-full mt-3 bg-[#FFF309]/20 hover:bg-[#FFF309] hover:text-slate-900 text-[#FFF309] border-none font-medium rounded-lg transition-all duration-200"
-                  >
-                    Select File
-                  </Button>
-                </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  accept=".pdf,.png,.jpg,.jpeg"
-                />
-              </div>
-
-              {/* Uploaded Files List */}
-              {processedDocuments.length > 0 && (
-                <div className="space-y-3 mb-6">
-                  <h4 className="font-medium text-gray-300 text-sm">Document Processing:</h4>
-                  <div className="space-y-2">
-                    {processedDocuments.map((doc, index) => (
-                      <motion.div
-                        key={doc.id}
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: index * 0.1, duration: 0.3 }}
-                        className={`bg-transparent backdrop-blur-sm p-3 rounded-lg border ${
-                          doc.status === 'completed' && doc.isValid 
-                            ? 'border-green-400/50' 
-                            : doc.status === 'error' || (doc.status === 'completed' && !doc.isValid)
-                            ? 'border-red-400/50'
-                            : 'border-white/20'
-                        }`}
-                      >
-                        <div className="font-medium text-white text-sm truncate">{doc.name}</div>
-                        <div className="text-gray-400 text-xs">{(doc.size / 1024).toFixed(1)} KB</div>
-                        
-                        {/* Status indicator */}
-                        <div className="flex items-center gap-2 mt-2">
-                          {doc.status === 'uploading' && (
-                            <>
-                              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                              <span className="text-xs text-blue-300">Uploading...</span>
-                            </>
-                          )}
-                          {doc.status === 'processing' && (
-                            <>
-                              <div className="w-2 h-2 bg-yellow-400 rounded-full animate-spin"></div>
-                              <span className="text-xs text-yellow-300">Processing...</span>
-                            </>
-                          )}
-                          {doc.status === 'completed' && doc.isValid && (
-                            <>
-                              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                              <span className="text-xs text-green-300">Valid Document</span>
-                            </>
-                          )}
-                          {doc.status === 'completed' && !doc.isValid && (
-                            <>
-                              <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                              <span className="text-xs text-red-300">Invalid Document</span>
-                            </>
-                          )}
-                          {doc.status === 'error' && (
-                            <>
-                              <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                              <span className="text-xs text-red-300">Error</span>
-                            </>
-                          )}
-                        </div>
-                        
-                        {/* Validation reason or error */}
-                        {doc.reason && (
-                          <div className="text-xs text-gray-400 mt-1 italic">
-                            {doc.reason}
-                          </div>
-                        )}
-                        {doc.error && (
-                          <div className="text-xs text-red-400 mt-1 italic">
-                            {doc.error}
-                          </div>
-                        )}
-                        
-                        {/* Metadata */}
-                        {doc.metadata && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            {doc.metadata.text_length} characters extracted
-                          </div>
-                        )}
-                      </motion.div>
-                    ))}
+              {rightSidebarView === 'upload' && (
+                <>
+                  <div className="mb-6">
+                    <h3 className="font-semibold text-white mb-3 misto-font">Upload Documents</h3>
+                    <p className="text-sm text-gray-300 leading-relaxed">Supported formats: PDF, PNG, JPG (max 10MB)</p>
                   </div>
-                </div>
+
+                  {/* Upload Area */}
+                  <div className="mb-4">
+                    <div className="bg-transparent backdrop-blur-sm border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-[#FFF309]/50 transition-colors duration-200">
+                      <Upload className="w-8 h-8 text-[#FFF309] mx-auto mb-3" />
+                      <p className="text-sm text-gray-300 mb-4">
+                        Drag and drop your file here or click the button below to select a file
+                      </p>
+                    </div>
+                    <div className="flex justify-center">
+                      <Button
+                        size="sm"
+                        onClick={handleUploadClick}
+                        className="w-full mt-3 bg-[#FFF309]/20 hover:bg-[#FFF309] hover:text-slate-900 text-[#FFF309] border-none font-medium rounded-lg transition-all duration-200"
+                      >
+                        Select File
+                      </Button>
+                    </div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      accept=".pdf,.png,.jpg,.jpeg"
+                    />
+                  </div>
+
+                  {/* Uploaded Files List */}
+                  {processedDocuments.length > 0 && (
+                    <div className="space-y-3 mb-6">
+                      <h4 className="font-medium text-gray-300 text-sm">Document Processing:</h4>
+                      <div className="space-y-2">
+                        {processedDocuments.map((doc, index) => (
+                          <motion.div
+                            key={doc.id}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: index * 0.1, duration: 0.3 }}
+                            className={`bg-transparent backdrop-blur-sm p-3 rounded-lg border ${
+                              doc.status === 'completed' && doc.isValid 
+                                ? 'border-green-400/50' 
+                                : doc.status === 'error' || (doc.status === 'completed' && !doc.isValid)
+                                ? 'border-red-400/50'
+                                : 'border-white/20'
+                            }`}
+                          >
+                            <div className="font-medium text-white text-sm truncate">{doc.name}</div>
+                            <div className="text-gray-400 text-xs">{(doc.size / 1024).toFixed(1)} KB</div>
+                            
+                            {/* Status indicator */}
+                            <div className="flex items-center gap-2 mt-2">
+                              {doc.status === 'uploading' && (
+                                <>
+                                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                                  <span className="text-xs text-blue-300">Uploading...</span>
+                                </>
+                              )}
+                              {doc.status === 'processing' && (
+                                <>
+                                  <div className="w-2 h-2 bg-yellow-400 rounded-full animate-spin"></div>
+                                  <span className="text-xs text-yellow-300">Processing...</span>
+                                </>
+                              )}
+                              {doc.status === 'completed' && doc.isValid && (
+                                <>
+                                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                                  <span className="text-xs text-green-300">Valid Document</span>
+                                </>
+                              )}
+                              {doc.status === 'completed' && !doc.isValid && (
+                                <>
+                                  <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                                  <span className="text-xs text-red-300">Invalid Document</span>
+                                </>
+                              )}
+                              {doc.status === 'error' && (
+                                <>
+                                  <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                                  <span className="text-xs text-red-300">Error</span>
+                                </>
+                              )}
+                            </div>
+                            
+                            {/* Validation reason or error */}
+                            {doc.reason && (
+                              <div className="text-xs text-gray-400 mt-1 italic">
+                                {doc.reason}
+                              </div>
+                            )}
+                            {doc.error && (
+                              <div className="text-xs text-red-400 mt-1 italic">
+                                {doc.error}
+                              </div>
+                            )}
+                            
+                            {/* Metadata */}
+                            {doc.metadata && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                {doc.metadata.text_length} characters extracted
+                              </div>
+                            )}
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Quick Actions */}
+                  <div className="pt-6 border-t border-white/10">
+                    <h4 className="font-medium text-gray-300 text-sm mb-3">Quick Actions</h4>
+                    <div className="space-y-2">
+                      {["Analyze Document", "Summarize Content", "Extract Key Points"].map((action, index) => (
+                        <motion.button
+                          key={index}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors duration-200"
+                        >
+                          {action}
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
 
-              {/* Quick Actions */}
-              <div className="pt-6 border-t border-white/10">
-                <h4 className="font-medium text-gray-300 text-sm mb-3">Quick Actions</h4>
-                <div className="space-y-2">
-                  {["Analyze Document", "Summarize Content", "Extract Key Points"].map((action, index) => (
-                    <motion.button
-                      key={index}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors duration-200"
-                    >
-                      {action}
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
+              {rightSidebarView === 'profile' && (
+                <ProfileDropdown 
+                  isExpanded={true}
+                  onToggle={() => {}} // No-op as we control view from outside
+                  refreshTrigger={refreshProfileTrigger}
+                />
+              )}
             </div>
           </motion.div>
         </div>
