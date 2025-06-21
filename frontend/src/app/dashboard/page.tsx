@@ -613,22 +613,7 @@ function ChatPageContent() {
                     </div>
                   )}
 
-                  {/* Quick Actions */}
-                  <div className="pt-6 border-t border-white/10">
-                    <h4 className="font-medium text-gray-300 text-sm mb-3">Quick Actions</h4>
-                    <div className="space-y-2">
-                      {["Analyze Document", "Summarize Content", "Extract Key Points"].map((action, index) => (
-                        <motion.button
-                          key={index}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors duration-200"
-                        >
-                          {action}
-                        </motion.button>
-                      ))}
-                    </div>
-                  </div>
+                  
                 </>
               )}
 
