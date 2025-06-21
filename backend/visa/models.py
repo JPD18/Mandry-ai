@@ -112,6 +112,25 @@ class UserProfile(models.Model):
         if additional_context: score += 20
         
         return min(score, 100)
+    
+    def is_complete(self):
+        """Check if profile has all required information for Q&A mode"""
+        # Core fields required: nationality, visa_intent, current_location, destination_country
+        core_complete = bool(
+            self.nationality and 
+            self.visa_intent and 
+            self.current_location and 
+            self.destination_country
+        )
+        
+        # Additional context required: at least one of conversation_insights, structured_data, or profile_context
+        additional_context = bool(
+            (self.conversation_insights and self.conversation_insights.strip()) or
+            (self.structured_data and len(self.structured_data) > 0) or
+            (self.profile_context and self.profile_context.strip())
+        )
+        
+        return core_complete and additional_context
 
 
 class UploadedDocument(models.Model):

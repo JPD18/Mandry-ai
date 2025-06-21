@@ -339,12 +339,21 @@ def langgraph_chat(request):
                 current_state=session_state
             )
             
+            # Build session_state for client to send back next time
+            session_state_out = {
+                'current_step': result['current_step'],
+                'message_history': result['message_history']
+            }
+            if result.get('last_question'):
+                session_state_out['last_question'] = result['last_question']
+
             return Response({
                 'response': result['response'],
                 'current_step': result['current_step'],
                 'context_sufficient': result['context_sufficient'],
                 'missing_context_areas': result['missing_context_areas'],
                 'session_data': result['session_data'],
+                'session_state': session_state_out,
                 'message_history': result['message_history']
             }, status=status.HTTP_200_OK)
             

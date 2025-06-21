@@ -96,7 +96,7 @@ export default function Home() {
           context_sufficient: data.context_sufficient,
           missing_context_areas: data.missing_context_areas,
           session_data: data.session_data,
-          message_history: filteredHistory
+          message_history: filteredHistory,
         })
         
         // Trigger initial profile refresh
@@ -151,7 +151,7 @@ export default function Home() {
         context_sufficient: data.context_sufficient,
         missing_context_areas: data.missing_context_areas,
         session_data: data.session_data,
-        message_history: data.message_history
+        message_history: data.message_history,
       })
       setMessage('') // Clear input
       

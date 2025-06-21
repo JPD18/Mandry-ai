@@ -27,13 +27,15 @@ class IntelligentVisaAssistantWorkflow:
     
     # All old LangGraph methods removed - using simple state machine now
     
-    def _extract_context_intelligently(self, message: str, profile: UserProfile, missing_areas: List[str]) -> Dict[str, Any]:
+    def _extract_context_intelligently(self, message: str, profile: UserProfile, missing_areas: List[str], previous_question: str = None) -> Dict[str, Any]:
         """Extract context information using AI-powered analysis"""
-        logger.info(f"🔍 EXTRACT_CONTEXT - Message: '{message[:50]}...', Current Profile: Nationality={profile.nationality}, Intent={profile.visa_intent}")
+        logger.info(f"🔍 EXTRACT_CONTEXT - Message: '{message[:50]}...', Current Profile: Nationality={profile.nationality}, Intent={profile.visa_intent}, Previous Q: '{previous_question}'")
         
         try:
             # Create extraction prompt
             system_prompt = """You are an expert visa consultant's assistant. Extract key information from user messages.
+
+IMPORTANT: If a previous question is provided, the user's message is likely answering that specific question. Use this context to interpret their response correctly.
 
 Analyze the user's message and extract the following information if present:
 - nationality: The user's nationality/citizenship
@@ -50,14 +52,23 @@ Analyze the user's message and extract the following information if present:
 Only extract information that is clearly stated or strongly implied. Don't make assumptions.
 Focus on capturing any additional context that would help understand their visa situation better."""
 
-            user_prompt = f"""User message: "{message}"
+            previous_question_context = ""
+            if previous_question:
+                previous_question_context = f"\n\nPreviously asked question (answer this): {previous_question}"
 
-Current profile context:
-- Current nationality: {profile.nationality or 'Not specified'}
-- Current visa intent: {profile.visa_intent or 'Not specified'}
-- Current location: {profile.current_location or 'Not specified'}
+            # Build user prompt
+            user_prompt = (
+                f"User message: \"{message}\""
+                "\n\nCurrent profile context:"
+                f"\n- Current nationality: {profile.nationality or 'Not specified'}"
+                f"\n- Current visa intent: {profile.visa_intent or 'Not specified'}"
+                f"\n- Current location: {profile.current_location or 'Not specified'}"
+            )
 
-Extract any new information from this message."""
+            if previous_question_context:
+                user_prompt += previous_question_context
+
+            user_prompt += "\n\nExtract any new information from this message."
 
             # Use AI to extract information
             extraction_result = anthropic_llm.call_for_json(
@@ -73,6 +84,18 @@ Extract any new information from this message."""
                     if key in extraction_result and extraction_result[key] and extraction_result[key].lower() not in ["not specified", "none", "n/a", ""]:
                         cleaned_result[key] = extraction_result[key]
             
+            # Post-processing: if AI missed mapping but we have previous_question hint
+            if previous_question:
+                pq_lower = previous_question.lower()
+                if ("current location" in pq_lower or "currently located" in pq_lower or "residing" in pq_lower) and "current_location" not in cleaned_result:
+                    cleaned_result["current_location"] = message.strip().title()
+                elif ("nationality" in pq_lower or "citizenship" in pq_lower) and "nationality" not in cleaned_result:
+                    cleaned_result["nationality"] = message.strip().title()
+                elif ("destination" in pq_lower and "country" in pq_lower) and "destination_country" not in cleaned_result:
+                    cleaned_result["destination_country"] = message.strip().title()
+                elif ("visa" in pq_lower and "type" in pq_lower) and "visa_intent" not in cleaned_result:
+                    cleaned_result["visa_intent"] = message.strip()
+            
             logger.info(f"✅ AI EXTRACTION SUCCESS: {cleaned_result}")
             return cleaned_result
             
@@ -81,39 +104,52 @@ Extract any new information from this message."""
             
             # Fallback to keyword matching
             logger.info(f"🔄 FALLBACK TO KEYWORD EXTRACTION")
-            message_lower = message.lower()
+            message_lower = message.lower().strip()
             extracted = {}
+
+            # If previous question gives strong hint, use that
+            if previous_question:
+                pq_lower = previous_question.lower()
+                if "nationality" in pq_lower or "citizenship" in pq_lower:
+                    extracted["nationality"] = message.strip().title()
+                elif "current location" in pq_lower or "currently located" in pq_lower or "residing" in pq_lower:
+                    extracted["current_location"] = message.strip().title()
+                elif "destination" in pq_lower and "country" in pq_lower:
+                    extracted["destination_country"] = message.strip().title()
+                elif "visa" in pq_lower and "type" in pq_lower:
+                    extracted["visa_intent"] = message.strip()
+
+            # Basic nationality detection (only if still not set)
+            if "nationality" not in extracted:
+                nationalities = {
+                    "ukrainian": "Ukrainian", "ukraine": "Ukrainian",
+                    "american": "American", "usa": "American", "us": "American",
+                    "indian": "Indian", "india": "Indian",
+                    "british": "British", "uk": "British",
+                    "canadian": "Canadian", "canada": "Canadian",
+                    "australian": "Australian", "australia": "Australian",
+                    "german": "German", "germany": "German",
+                    "french": "French", "france": "French",
+                    "chinese": "Chinese", "china": "Chinese",
+                    "japanese": "Japanese", "japan": "Japanese"
+                }
+                for keyword, nationality in nationalities.items():
+                    if keyword in message_lower:
+                        extracted["nationality"] = nationality
+                        break
             
-            # Basic nationality detection
-            nationalities = {
-                "ukrainian": "Ukrainian", "ukraine": "Ukrainian",
-                "american": "American", "usa": "American", "us": "American",
-                "indian": "Indian", "india": "Indian",
-                "british": "British", "uk": "British",
-                "canadian": "Canadian", "canada": "Canadian",
-                "australian": "Australian", "australia": "Australian",
-                "german": "German", "germany": "German",
-                "french": "French", "france": "French",
-                "chinese": "Chinese", "china": "Chinese",
-                "japanese": "Japanese", "japan": "Japanese"
-            }
-            
-            for keyword, nationality in nationalities.items():
-                if keyword in message_lower:
-                    extracted["nationality"] = nationality
-                    break
-            
-            # Basic intent detection
-            if any(word in message_lower for word in ["work", "job", "employment", "working", "career"]):
-                extracted["visa_intent"] = "Work visa"
-            elif any(word in message_lower for word in ["study", "university", "education", "student", "studying", "school"]):
-                extracted["visa_intent"] = "Student visa"
-            elif any(word in message_lower for word in ["visit", "travel", "tourism", "tourist", "vacation", "holiday"]):
-                extracted["visa_intent"] = "Tourist visa"
-            elif any(word in message_lower for word in ["family", "spouse", "partner", "marry", "marriage"]):
-                extracted["visa_intent"] = "Family visa"
-            elif any(word in message_lower for word in ["business", "investor", "investment"]):
-                extracted["visa_intent"] = "Business visa"
+            # Basic intent detection (only if still not set)
+            if "visa_intent" not in extracted:
+                if any(word in message_lower for word in ["work", "job", "employment", "working", "career"]):
+                    extracted["visa_intent"] = "Work visa"
+                elif any(word in message_lower for word in ["study", "university", "education", "student", "studying", "school"]):
+                    extracted["visa_intent"] = "Student visa"
+                elif any(word in message_lower for word in ["visit", "travel", "tourism", "tourist", "vacation", "holiday"]):
+                    extracted["visa_intent"] = "Tourist visa"
+                elif any(word in message_lower for word in ["family", "spouse", "partner", "marry", "marriage"]):
+                    extracted["visa_intent"] = "Family visa"
+                elif any(word in message_lower for word in ["business", "investor", "investment"]):
+                    extracted["visa_intent"] = "Business visa"
             
             logger.info(f"✅ KEYWORD EXTRACTION RESULT: {extracted}")
             return extracted
@@ -216,8 +252,20 @@ Extract any new information from this message."""
             current_step = current_state.get("current_step", "assess_context") if current_state else "assess_context"
             logger.info(f"🎯 Current Step Determined: {current_step}")
             
-            # Restore message history
+            # Restore message history and previous question
             message_history = current_state.get("message_history", []) if current_state else []
+            previous_question = current_state.get("last_question") if current_state else None
+            
+            # If previous_question not explicitly provided, infer from last AI message in history
+            if not previous_question and message_history:
+                # Traverse history from the end to find last AI message (excluding system messages if any)
+                for past_msg in reversed(message_history):
+                    if past_msg.get("type") == "ai":
+                        ai_content = past_msg.get("content", "")
+                        # Use the whole content if it looks like a question (contains '?')
+                        if "?" in ai_content:
+                            previous_question = ai_content.strip()
+                        break
             
             # Add user message to history
             message_history.append({"type": "human", "content": message})
@@ -227,7 +275,7 @@ Extract any new information from this message."""
             if current_step == "assess_context":
                 response, next_step = self._handle_assess_context(user, profile, message)
             elif current_step == "gather_context":
-                response, next_step = self._handle_gather_context(user, profile, message)
+                response, next_step = self._handle_gather_context(user, profile, message, previous_question)
             elif current_step == "intelligent_qna":
                 response, next_step = self._handle_qna(user, profile, message)
             else:
@@ -249,7 +297,8 @@ Extract any new information from this message."""
                     "profile_id": profile.id,
                     "context_completeness": profile.get_context_completeness()
                 },
-                "message_history": message_history
+                "message_history": message_history,
+                "last_question": response if next_step == "gather_context" else None
             }
             
         except Exception as e:
@@ -260,61 +309,33 @@ Extract any new information from this message."""
                 "context_sufficient": False,
                 "missing_context_areas": [],
                 "session_data": {},
-                "message_history": []
+                "message_history": [],
+                "last_question": None
             }
     
     def _handle_assess_context(self, user: User, profile: UserProfile, message: str) -> tuple[str, str]:
-        """Handle context assessment step with intelligent welcome"""
+        """Handle the initial context assessment"""
         logger.info(f"🔍 ASSESS_CONTEXT HANDLER - User: {user.username}, Message: '{message[:30]}...'")
         
-        # Check if we have basic context
-        has_nationality = bool(profile.nationality)
-        has_intent = bool(profile.visa_intent)
-        has_location = bool(profile.current_location)
-        has_destination = bool(profile.destination_country)
-        has_additional_context = bool(profile.profile_context) or bool(profile.structured_data)
+        # Check if profile is complete
+        if profile.is_complete():
+            logger.info("✅ PROFILE COMPLETE - Moving to Q&A")
+            return self._handle_qna(user, profile, message)
         
-        logger.info(f"📋 Context Check - Nationality: {has_nationality}, Intent: {has_intent}, Location: {has_location}, Destination: {has_destination}, Additional: {has_additional_context}")
+        # Profile incomplete - extract what we can from this message
+        extraction_result = self._extract_context_intelligently(message, profile, [])
+        logger.info(f"🔍 INITIAL EXTRACTION: {extraction_result}")
+        self._update_profile_from_extraction(profile, extraction_result)
         
-        # Check if this is a completely new user (empty profile)
-        is_new_user = not any([profile.nationality, profile.visa_intent, profile.current_location, profile.conversation_insights])
-        logger.info(f"👤 User Status - Is New User: {is_new_user}")
+        # Check again if profile is now complete
+        if profile.is_complete():
+            logger.info("✅ PROFILE NOW COMPLETE - Moving to Q&A")
+            return self._handle_qna(user, profile, message)
         
-        # Check if profile is 100% complete (all core fields + additional context)
-        profile_complete = (has_nationality and has_intent and has_location and has_destination and has_additional_context)
-        
-        if profile_complete:
-            logger.info(f"✅ PROFILE 100% COMPLETE - Moving to Q&A mode")
-            profile.context_sufficient = True
-            profile.save()
-            try:
-                # Generate personalized welcome message for returning users
-                response = self._generate_welcome_message(profile, message)
-            except Exception as e:
-                logger.warning(f"AI welcome generation failed: {e}")
-                response = f"Perfect! I have all the information I need. What specific questions do you have about your {profile.visa_intent}?"
-            next_step = "intelligent_qna"
-        elif is_new_user:
-            logger.info(f"🆕 NEW USER - Generating welcome message")
-            try:
-                # Generate visa-focused welcome message for brand new users
-                response = self._generate_new_user_welcome(message)
-            except Exception as e:
-                logger.warning(f"AI new user welcome failed: {e}")
-                response = "👋 Welcome to Mandry AI! I will help you with visa and travel planning assistance.\n\nI will ask you a few questions to understand your plans and intents clearly. There might be multiple questions to best understand your case and needs.\n\nWhat specific visa or travel help do you need?"
-            next_step = "gather_context"
-        else:
-            logger.info(f"📝 PARTIAL CONTEXT - Generating initial assessment")
-            try:
-                # Generate intelligent initial assessment for users with partial info
-                response = self._generate_initial_assessment(profile, message)
-            except Exception as e:
-                logger.warning(f"AI initial assessment failed: {e}")
-                response = "What's your nationality and what type of visa do you need?"
-            next_step = "gather_context"
-        
-        logger.info(f"🔚 ASSESS_CONTEXT RESULT - Next Step: {next_step}")
-        return response, next_step
+        # Still incomplete - ask next question
+        next_question = self._get_next_question(profile)
+        logger.info(f"❓ ASKING NEXT QUESTION: {next_question}")
+        return next_question, "gather_context"
     
     def _generate_new_user_welcome(self, message: str) -> str:
         """Generate visa-focused welcome message for brand new users"""
@@ -402,12 +423,12 @@ Generate an appropriate response that acknowledges their partial profile and ask
         
         return response
     
-    def _handle_gather_context(self, user: User, profile: UserProfile, message: str) -> tuple[str, str]:
+    def _handle_gather_context(self, user: User, profile: UserProfile, message: str, previous_question: str) -> tuple[str, str]:
         """Handle context gathering step with intelligent follow-up"""
         logger.info(f"📝 GATHER_CONTEXT HANDLER - User: {user.username}, Message: '{message[:30]}...'")
         
         # Extract info from message
-        extraction_result = self._extract_context_intelligently(message, profile, [])
+        extraction_result = self._extract_context_intelligently(message, profile, [], previous_question)
         logger.info(f"🔍 EXTRACTION RESULT: {extraction_result}")
         self._update_profile_from_extraction(profile, extraction_result)
         
@@ -621,6 +642,24 @@ Provide a helpful, personalized response addressing their question. Use their pr
         )
         
         return response
+
+    def _get_next_question(self, profile: UserProfile) -> str:
+        """Get the next question to ask based on what's missing"""
+        logger.info(f"❓ GETTING NEXT QUESTION - Profile: Nationality={profile.nationality}, Intent={profile.visa_intent}, Location={profile.current_location}, Destination={profile.destination_country}")
+        
+        # Define specific questions for missing information
+        if not profile.nationality:
+            return "What is your nationality or citizenship?"
+        elif not profile.visa_intent:
+            return "What type of visa are you applying for? (e.g., work visa, student visa, tourist visa, family visa, business visa)"
+        elif not profile.current_location:
+            return "Where are you currently located or residing?"
+        elif not profile.destination_country:
+            return "Which country do you want to visit or move to?"
+        elif not (profile.profile_context or profile.structured_data):
+            return "Could you tell me more about your specific situation, background, or any concerns you have about your visa application?"
+        else:
+            return "Is there anything else about your visa situation that you'd like to discuss or clarify?"
 
 
 # Global instance
