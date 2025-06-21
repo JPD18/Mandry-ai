@@ -210,41 +210,37 @@ export function ProfileDropdown({ isExpanded, onToggle, refreshTrigger = 0 }: Pr
           {profile && !loading && (
             <div className="space-y-4">
               {/* Core Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Globe className="h-4 w-4 text-blue-600" />
-                    <span className="font-medium">Nationality:</span>
-                    <span className={profile.nationality ? "text-gray-900" : "text-gray-400"}>
-                      {profile.nationality || "Not specified"}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-green-600" />
-                    <span className="font-medium">Current Location:</span>
-                    <span className={profile.current_location ? "text-gray-900" : "text-gray-400"}>
-                      {profile.current_location || "Not specified"}
-                    </span>
-                  </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-blue-600" />
+                  <span className="font-medium">Nationality:</span>
+                  <span className={profile.nationality ? "text-gray-900" : "text-gray-400"}>
+                    {profile.nationality || "Not specified"}
+                  </span>
                 </div>
 
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Target className="h-4 w-4 text-purple-600" />
-                    <span className="font-medium">Destination:</span>
-                    <span className={profile.destination_country ? "text-gray-900" : "text-gray-400"}>
-                      {profile.destination_country || "Not specified"}
-                    </span>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-green-600" />
+                  <span className="font-medium">Current Location:</span>
+                  <span className={profile.current_location ? "text-gray-900" : "text-gray-400"}>
+                    {profile.current_location || "Not specified"}
+                  </span>
+                </div>
 
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-orange-600" />
-                    <span className="font-medium">Visa Intent:</span>
-                    <span className={profile.visa_intent ? "text-gray-900" : "text-gray-400"}>
-                      {profile.visa_intent || "Not specified"}
-                    </span>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Target className="h-4 w-4 text-purple-600" />
+                  <span className="font-medium">Destination:</span>
+                  <span className={profile.destination_country ? "text-gray-900" : "text-gray-400"}>
+                    {profile.destination_country || "Not specified"}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-orange-600" />
+                  <span className="font-medium">Visa Intent:</span>
+                  <span className={profile.visa_intent ? "text-gray-900" : "text-gray-400"}>
+                    {profile.visa_intent || "Not specified"}
+                  </span>
                 </div>
               </div>
 
