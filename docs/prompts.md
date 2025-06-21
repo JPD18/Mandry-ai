@@ -180,3 +180,6 @@ class LLMService:
 # you can export a singleton for convenience
 default_llm = LLMService()
 
+## Implementing a static folder serving from djanogo:
+
+I have frontend files located in @/frontend folder which is build by npm run build and then I need to run next export. afterwards I need to move all of the static files to the new folder called static in @/backend, afterwards add code to backend for django server to serve static content there at the root of the api
