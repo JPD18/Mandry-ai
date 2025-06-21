@@ -10,6 +10,8 @@ import { Upload, Send } from "lucide-react"
 import { ChatInput } from "@/components/ui/chat-input"
 import { Button } from "@/components/ui/button"
 import { ChatAuthGuard } from "@/components/chat-auth-guard"
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
+import { CitationList } from "@/components/ui/citation"
 
 interface Message {
   id: string
@@ -238,13 +240,22 @@ function ChatPageContent() {
                         ></div>
                       )}
                       <div
-                        className={`max-w-xs lg:max-w-md px-6 py-4 rounded-2xl backdrop-blur-sm border ${
+                        className={`max-w-full sm:max-w-md px-6 py-4 rounded-2xl backdrop-blur-sm border break-words whitespace-pre-wrap ${
                           msg.role === "user"
                             ? "bg-gradient-to-r from-[#FFF309]/20 to-[#FFF309]/10 text-white border-[#FFF309]/30"
-                            : "bg-white/10 text-gray-100 border-white/20"
+                            : "bg-white/10 text-white border-white/20"
                         }`}
                       >
-                        {msg.content}
+                        {msg.role === "assistant" ? (
+                          <>
+                            <MarkdownRenderer content={msg.content} />
+                            {msg.citations && msg.citations.length > 0 && (
+                              <CitationList citations={msg.citations} />
+                            )}
+                          </>
+                        ) : (
+                          msg.content
+                        )}
                       </div>
                     </motion.div>
                   ))}

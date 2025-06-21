@@ -91,47 +91,47 @@
   }
 }
 
-/* Prose styling for markdown content */
+/* Prose styling for markdown content adjusted for dark theme */
 .prose {
-  @apply text-gray-800 leading-relaxed;
+  @apply text-white leading-relaxed;
 }
 
 .prose p {
-  @apply mb-4 last:mb-0;
+  @apply mb-4 last:mb-0 text-white;
 }
 
 .prose strong {
-  @apply font-semibold text-gray-900;
+  @apply font-semibold text-white;
 }
 
 .prose em {
-  @apply italic;
+  @apply italic text-white;
 }
 
 .prose ul {
-  @apply list-disc list-inside mb-4 space-y-1;
+  @apply list-disc list-inside mb-4 space-y-1 text-white;
 }
 
 .prose ol {
-  @apply list-decimal list-inside mb-4 space-y-1;
+  @apply list-decimal list-inside mb-4 space-y-1 text-white;
 }
 
 .prose li {
-  @apply text-gray-700;
+  @apply text-white;
 }
 
 .prose a {
-  @apply text-blue-600 hover:text-blue-800 underline;
+  @apply text-blue-300 hover:text-blue-500 underline;
 }
 
 .prose blockquote {
-  @apply border-l-4 border-gray-300 pl-4 italic text-gray-600 mb-4;
+  @apply border-l-4 border-gray-300 pl-4 italic text-white mb-4;
 }
 
 .prose code {
-  @apply bg-gray-100 px-1 py-0.5 rounded text-sm font-mono;
+  @apply bg-white/10 px-1 py-0.5 rounded text-sm font-mono text-yellow-200;
 }
 
 .prose pre {
-  @apply bg-gray-50 p-3 rounded-lg overflow-x-auto text-sm font-mono mb-4;
+  @apply bg-white/10 p-3 rounded-lg overflow-x-auto text-sm font-mono mb-4 text-white;
 } 
