@@ -181,5 +181,7 @@ class LLMService:
 default_llm = LLMService()
 
 RAG PROMPT-  create a rag based on this search, so extracting the main query from the users question, sending it to the valyu api, and feeding its response to the llm to enrich its context
+## Implementing a static folder serving from djanogo:
 
+I have frontend files located in @/frontend folder which is build by npm run build and then I need to run next export. afterwards I need to move all of the static files to the new folder called static in @/backend, afterwards add code to backend for django server to serve static content there at the root of the api
 Citations prompt- so in the chat page, when context is retrieved it is correctly fed to the LLM and then passed to the UI however the citations format and text formatting of the q&a does not work, investigate this and create a plan to make clear citations and text formatting
