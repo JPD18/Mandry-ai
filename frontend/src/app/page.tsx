@@ -51,8 +51,7 @@ export default function Home() {
     if (token && storedUsername) {
       setIsAuthenticated(true)
       setUsername(storedUsername)
-      // Initialize the chat with a welcome message
-      initializeChat()
+      // Don't auto-initialize - wait for user to start
     } else {
       // Redirect to login if not authenticated
       router.push('/login')
@@ -60,39 +59,7 @@ export default function Home() {
     setLoading(false)
   }, [router])
 
-  const initializeChat = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('http://localhost:8000/api/chat/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Token ${token}`,
-        },
-        body: JSON.stringify({ 
-          message: "Hello, I'd like to get started with my visa application.",
-          session_state: null 
-        }),
-      })
-
-      const data: LangGraphResponse = await response.json()
-      
-      if (response.ok) {
-        setChatHistory(data.message_history)
-        setCurrentStep(data.current_step)
-        setContextSufficient(data.context_sufficient)
-        setSessionState({
-          current_step: data.current_step,
-          context_sufficient: data.context_sufficient,
-          missing_context_areas: data.missing_context_areas,
-          session_data: data.session_data,
-          message_history: data.message_history
-        })
-      }
-    } catch (error) {
-      console.error('Failed to initialize chat:', error)
-    }
-  }
+  // Removed auto-initialization to prevent loops
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -196,7 +163,7 @@ export default function Home() {
   const getStepIcon = () => {
     switch (currentStep) {
       case 'assess_context':
-        return <Settings className="h-5 w-5 animate-spin" />
+        return <Settings className="h-5 w-5" />
       case 'gather_context':
         return <User className="h-5 w-5" />
       case 'intelligent_qna':
@@ -228,9 +195,14 @@ export default function Home() {
 
       {/* Status Indicator */}
       <div className="flex items-center justify-center gap-2 p-4 bg-blue-50 rounded-lg">
-        {getStepIcon()}
+        {chatLoading ? <Settings className="h-5 w-5 animate-spin" /> : getStepIcon()}
         <span className="font-medium text-blue-900">
-          {contextSufficient ? 'Context Complete' : `Context ${sessionState?.session_data?.context_completeness || 0}% Complete`}
+          {contextSufficient 
+            ? 'Ready for Questions' 
+            : sessionState?.session_data?.context_completeness > 0 
+              ? `Context ${sessionState.session_data.context_completeness}% Complete`
+              : 'Getting Started'
+          }
         </span>
         <span className="text-blue-700">•</span>
         <span className="text-blue-700">{getStepTitle()}</span>
@@ -246,55 +218,75 @@ export default function Home() {
             {getStepDescription()}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {/* Chat History */}
-          {chatHistory.length > 0 && (
-            <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
-              {chatHistory.map((msg, index) => (
+          <div className="h-96 overflow-y-auto p-6 space-y-4 bg-gray-50">
+            {chatHistory.length > 0 ? (
+              chatHistory.map((msg, index) => (
                 <div key={index} className={`flex ${msg.type === 'human' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                  <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg shadow-sm ${
                     msg.type === 'human' 
                       ? 'bg-blue-500 text-white' 
-                      : 'bg-gray-200 text-gray-800'
+                      : 'bg-white text-gray-800 border'
                   }`}>
                     <MarkdownRenderer content={msg.content} />
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+              ))
+            ) : (
+              <div className="text-center text-gray-500">
+                <MessageCircle className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>Start a conversation to begin your visa consultation</p>
+              </div>
+            )}
+            
+            {/* Loading Indicator */}
+            {chatLoading && (
+              <div className="flex justify-start">
+                <div className="bg-white px-4 py-2 rounded-lg shadow-sm border">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4 animate-spin" />
+                    <span className="text-gray-500">Thinking...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Message Input */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Textarea
-              placeholder={
-                currentStep === 'gather_context' 
-                  ? "Tell me about your situation..."
-                  : "Ask me anything about your visa application..."
-              }
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              className="min-h-[100px]"
-            />
-            <Button 
-              type="submit" 
-              disabled={chatLoading || !message.trim()}
-              className="w-full"
-            >
-              {chatLoading ? 'Sending...' : 'Send Message'}
-            </Button>
-          </form>
+          <div className="p-6 border-t">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <Textarea
+                placeholder={
+                  currentStep === 'gather_context' 
+                    ? "Tell me your nationality and visa type..."
+                    : "Ask me anything about your visa application..."
+                }
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                className="min-h-[100px]"
+                disabled={chatLoading}
+              />
+              <Button 
+                type="submit" 
+                disabled={chatLoading || !message.trim()}
+                className="w-full"
+              >
+                {chatLoading ? 'Sending...' : 'Send Message'}
+              </Button>
+            </form>
 
-          {/* Error Display */}
-          {error && (
-            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 className="font-semibold text-red-800 mb-1">Error</h3>
-                <p className="text-red-700 text-sm">{error}</p>
+            {/* Error Display */}
+            {error && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-red-800 mb-1">Error</h3>
+                  <p className="text-red-700 text-sm">{error}</p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

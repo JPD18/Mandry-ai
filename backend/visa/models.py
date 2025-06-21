@@ -67,9 +67,22 @@ class UserProfile(models.Model):
         self.save()
     
     def add_context_insight(self, insight):
-        """Add to conversation insights"""
+        """Add to conversation insights (avoid duplicates)"""
+        if not insight or insight.strip() == "":
+            return
+            
+        # Check if this insight already exists
+        if self.conversation_insights and insight in self.conversation_insights:
+            return
+            
         if self.conversation_insights:
-            self.conversation_insights += f"\n• {insight}"
+            # Limit to last 5 insights to avoid system prompt bloat
+            insights = self.conversation_insights.split('\n• ')
+            insights = [i.strip('• ') for i in insights if i.strip()]
+            if len(insights) >= 5:
+                insights = insights[-4:]  # Keep last 4, add new one
+            insights.append(insight)
+            self.conversation_insights = '\n• '.join([''] + insights).strip()
         else:
             self.conversation_insights = f"• {insight}"
         self.save()
