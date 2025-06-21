@@ -25,33 +25,19 @@ export default function SiteHeader() {
             <motion.div layoutId={STAR_ID}>
               <MandryStarIcon size={40} uniqueId="header" />
             </motion.div>
-            <span className="font-bold text-xl text-white">Mandry AI</span>
           </Link>
           
-          {pathname !== '/dashboard' ? (
-            <Link
-              href="/dashboard"
-              className="text-gray-300 hover:text-white transition-colors duration-200 font-medium"
-            >
-              Chat
-            </Link>
-          ) : (
-            <span className="text-gray-500 font-medium cursor-default">
-              Chat
+          {(pathname === '/about' || pathname.startsWith('/about')) ? (
+            <span className="text-yellow-400 font-medium cursor-default">
+              About Us
             </span>
-          )}
-          
-          {pathname !== '/about' ? (
+          ) : (
             <Link
               href="/about"
               className="text-gray-300 hover:text-white transition-colors duration-200 font-medium"
             >
               About Us
             </Link>
-          ) : (
-            <span className="text-gray-500 font-medium cursor-default">
-              About Us
-            </span>
           )}
         </div>
 

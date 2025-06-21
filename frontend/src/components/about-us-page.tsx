@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MandryBaseIcon } from "./mandry-icon"
+import { Navbar } from "./Navbar"
 
 export default function AboutUsPage() {
   const [activeSection, setActiveSection] = useState("overview")
@@ -15,7 +16,7 @@ export default function AboutUsPage() {
   ]
 
   return (
-    <>
+    <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
       {/* Font loading */}
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Misto:wght@400;500;600;700&display=swap');
@@ -25,79 +26,87 @@ export default function AboutUsPage() {
         }
       `}</style>
 
-      <motion.section
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="flex-1 px-6 py-12"
-      >
-        <div className="max-w-7xl mx-auto">
-          {/* About Us Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.6 }}
-            className="text-center mb-12"
-          >
-            <h1 className="text-5xl font-bold text-white mb-4 misto-font">About Us</h1>
-            <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              Discover who we are, what we stand for, and how we're revolutionizing digital navigation
-            </p>
-          </motion.div>
+      <Navbar 
+        showAboutUs={true}
+        showChat={true}
+        showSchedule={true}
+      />
 
-          {/* Section Navigation */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.6 }}
-            className="flex justify-center mb-12"
-          >
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 p-2 flex space-x-2">
-              {sections.map((section, index) => (
-                <motion.button
-                  key={section.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.5 + index * 0.1, duration: 0.4 }}
-                  onClick={() => setActiveSection(section.id)}
-                  className={`flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 ${
-                    activeSection === section.id
-                      ? "bg-yellow-500/30 text-yellow-300 shadow-lg"
-                      : "text-gray-300 hover:text-white hover:bg-white/10"
-                  }`}
+      <div className="pt-20 h-full flex flex-col">
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="flex-1 px-6 py-12"
+        >
+          <div className="max-w-7xl mx-auto">
+            {/* About Us Header */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.6 }}
+              className="text-center mb-12"
+            >
+              <h1 className="text-5xl font-bold text-white mb-4 misto-font">About Us</h1>
+              <p className="text-xl text-gray-300 max-w-3xl mx-auto">
+                Discover who we are, what we stand for, and how we're revolutionizing digital navigation
+              </p>
+            </motion.div>
+
+            {/* Section Navigation */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.6 }}
+              className="flex justify-center mb-12"
+            >
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 p-2 flex space-x-2">
+                {sections.map((section, index) => (
+                  <motion.button
+                    key={section.id}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.5 + index * 0.1, duration: 0.4 }}
+                    onClick={() => setActiveSection(section.id)}
+                    className={`flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 ${
+                      activeSection === section.id
+                        ? "bg-yellow-500/30 text-yellow-300 shadow-lg"
+                        : "text-gray-300 hover:text-white hover:bg-white/10"
+                    }`}
+                  >
+                    <span className="text-lg">{section.icon}</span>
+                    <span className="font-medium">{section.label}</span>
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+
+            {/* Content Area */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6, duration: 0.6 }}
+              className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-8 min-h-[600px]"
+            >
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeSection}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.4 }}
                 >
-                  <span className="text-lg">{section.icon}</span>
-                  <span className="font-medium">{section.label}</span>
-                </motion.button>
-              ))}
-            </div>
-          </motion.div>
-
-          {/* Content Area */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6, duration: 0.6 }}
-            className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-8 min-h-[600px]"
-          >
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeSection}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.4 }}
-              >
-                {activeSection === "overview" && <OverviewSection />}
-                {activeSection === "values" && <ValuesSection />}
-                {activeSection === "mission" && <MissionSection />}
-                {activeSection === "functionality" && <FunctionalitySection />}
-              </motion.div>
-            </AnimatePresence>
-          </motion.div>
-        </div>
-      </motion.section>
-    </>
+                  {activeSection === "overview" && <OverviewSection />}
+                  {activeSection === "values" && <ValuesSection />}
+                  {activeSection === "mission" && <MissionSection />}
+                  {activeSection === "functionality" && <FunctionalitySection />}
+                </motion.div>
+              </AnimatePresence>
+            </motion.div>
+          </div>
+        </motion.section>
+      </div>
+    </div>
   )
 }
 

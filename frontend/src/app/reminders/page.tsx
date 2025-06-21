@@ -1,29 +1,18 @@
-'use client'
+"use client"
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { ReminderDashboard } from '@/components/ReminderDashboard'
-import { 
-  Calendar, 
-  Clock, 
-  User, 
-  CheckCircle, 
-  AlertCircle, 
-  Bell,
-  Plus,
-  List,
-  AlertTriangle,
-  FileText,
-  UserCheck,
-  Briefcase,
-  MessageSquare,
-  Trash2,
-  Edit
-} from 'lucide-react'
+import type React from "react"
+import { useState, useEffect } from "react"
+import { motion } from "framer-motion"
+import { Calendar, Clock, Bell, Plus, AlertCircle, CheckCircle2, ArrowLeft, Users } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import { Navbar } from "@/components/Navbar"
+import { useRouter } from "next/navigation"
 
 interface Reminder {
   id: number
@@ -38,21 +27,37 @@ interface Reminder {
   created_at: string
 }
 
-export default function RemindersPage() {
+const reminderTypes = [
+  { value: "visa_appointment", label: "Visa Appointment", icon: Calendar },
+  { value: "visa_expiry", label: "Visa Expiry", icon: AlertCircle },
+  { value: "document_deadline", label: "Document Deadline", icon: Clock },
+  { value: "consultation", label: "Consultation", icon: Bell },
+  { value: "document_review", label: "Document Review", icon: CheckCircle2 },
+  { value: "application_submission", label: "Application Submission", icon: Plus },
+  { value: "interview_prep", label: "Interview Preparation", icon: Calendar },
+]
+
+const priorityLevels = [
+  { value: "low", label: "Low", colour: "bg-green-500" },
+  { value: "medium", label: "Medium", colour: "bg-yellow-500" },
+  { value: "high", label: "High", colour: "bg-orange-500" },
+  { value: "urgent", label: "Urgent", colour: "bg-red-500" },
+]
+
+export default function SchedulingPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'create' | 'list'>('list')
+  const [currentView, setCurrentView] = useState<"menu" | "create" | "manage">("menu")
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [loadingReminders, setLoadingReminders] = useState(false)
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    reminder_type: 'visa_appointment',
-    target_date: '',
-    target_time: '',
-    priority: 'medium',
-    notes: '',
-    custom_intervals: '' // comma-separated values
+    title: "",
+    reminderType: "",
+    targetDate: "",
+    targetTime: "",
+    priority: "medium",
+    description: "",
+    notes: "",
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [result, setResult] = useState<{
@@ -60,23 +65,6 @@ export default function RemindersPage() {
     message: string
   } | null>(null)
   const router = useRouter()
-
-  const reminderTypes = [
-    { value: 'visa_appointment', label: 'Visa Appointment', icon: Calendar, color: 'text-blue-600' },
-    { value: 'visa_expiry', label: 'Visa Expiry', icon: AlertTriangle, color: 'text-red-600' },
-    { value: 'document_deadline', label: 'Document Deadline', icon: FileText, color: 'text-orange-600' },
-    { value: 'consultation', label: 'Consultation', icon: MessageSquare, color: 'text-green-600' },
-    { value: 'document_review', label: 'Document Review', icon: UserCheck, color: 'text-purple-600' },
-    { value: 'application_submission', label: 'Application Submission', icon: Briefcase, color: 'text-indigo-600' },
-    { value: 'interview_prep', label: 'Interview Preparation', icon: User, color: 'text-pink-600' }
-  ]
-
-  const priorityLevels = [
-    { value: 'low', label: 'Low', color: 'text-green-600' },
-    { value: 'medium', label: 'Medium', color: 'text-yellow-600' },
-    { value: 'high', label: 'High', color: 'text-orange-600' },
-    { value: 'urgent', label: 'Urgent', color: 'text-red-600' }
-  ]
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -110,15 +98,14 @@ export default function RemindersPage() {
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+  const handleInputChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!formData.title || !formData.target_date || !formData.target_time) {
+    if (!formData.title || !formData.targetDate || !formData.targetTime) {
       setResult({
         success: false,
         message: 'Please fill in all required fields.'
@@ -131,27 +118,15 @@ export default function RemindersPage() {
 
     try {
       // Combine date and time into ISO format
-      const target_date = new Date(`${formData.target_date}T${formData.target_time}`).toISOString()
+      const target_date = new Date(`${formData.targetDate}T${formData.targetTime}`).toISOString()
       
       const requestData: any = {
         title: formData.title,
         description: formData.description,
-        reminder_type: formData.reminder_type,
+        reminder_type: formData.reminderType,
         target_date: target_date,
         priority: formData.priority,
         notes: formData.notes
-      }
-
-      // Add custom intervals if provided
-      if (formData.custom_intervals.trim()) {
-        const intervals = formData.custom_intervals
-          .split(',')
-          .map(i => parseInt(i.trim()))
-          .filter(i => !isNaN(i) && i > 0)
-        
-        if (intervals.length > 0) {
-          requestData.custom_intervals = intervals
-        }
       }
       
       const token = localStorage.getItem('token')
@@ -173,17 +148,18 @@ export default function RemindersPage() {
         })
         // Reset form
         setFormData({
-          title: '',
-          description: '',
-          reminder_type: 'visa_appointment',
-          target_date: '',
-          target_time: '',
-          priority: 'medium',
-          notes: '',
-          custom_intervals: ''
+          title: "",
+          reminderType: "",
+          targetDate: "",
+          targetTime: "",
+          priority: "medium",
+          description: "",
+          notes: "",
         })
         // Reload reminders list
         loadReminders()
+        // Switch to manage view
+        setCurrentView("manage")
       } else {
         setResult({
           success: false,
@@ -204,8 +180,8 @@ export default function RemindersPage() {
   const updateReminderStatus = async (reminderId: number, status: string) => {
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(`http://localhost:8000/api/reminders/${reminderId}/status/`, {
-        method: 'PUT',
+      const response = await fetch(`http://localhost:8000/api/reminders/${reminderId}/update_status/`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Token ${token}`,
@@ -214,7 +190,6 @@ export default function RemindersPage() {
       })
 
       if (response.ok) {
-        // Reload reminders to show updated status
         loadReminders()
       }
     } catch (error) {
@@ -223,400 +198,495 @@ export default function RemindersPage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return new Date(dateString).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     })
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'text-blue-600 bg-blue-50 border-blue-200'
-      case 'sent': return 'text-green-600 bg-green-50 border-green-200'
-      case 'completed': return 'text-gray-600 bg-gray-50 border-gray-200'
-      case 'cancelled': return 'text-red-600 bg-red-50 border-red-200'
-      default: return 'text-gray-600 bg-gray-50 border-gray-200'
-    }
+  const getPriorityColour = (priority: string) => {
+    const priorityObj = priorityLevels.find((p) => p.value === priority)
+    return priorityObj?.colour || "bg-grey-500"
   }
 
-  const getPriorityColor = (priority: string) => {
-    const priorityConfig = priorityLevels.find(p => p.value === priority)
-    return priorityConfig?.color || 'text-gray-600'
-  }
-
-  const getReminderTypeIcon = (type: string) => {
-    const typeConfig = reminderTypes.find(t => t.value === type)
-    return typeConfig?.icon || Bell
-  }
-
-  const getReminderTypeColor = (type: string) => {
-    const typeConfig = reminderTypes.find(t => t.value === type)
-    return typeConfig?.color || 'text-gray-600'
-  }
-
-  const getDefaultIntervals = (type: string) => {
-    const defaults: { [key: string]: number[] } = {
-      'visa_appointment': [7, 1],
-      'visa_expiry': [30, 7, 1],
-      'document_deadline': [7, 3, 1],
-      'consultation': [3, 1],
-      'document_review': [2, 1],
-      'application_submission': [7, 3, 1],
-      'interview_prep': [7, 1]
-    }
-    return defaults[type] || [1]
-  }
-
-  // Show loading while checking authentication
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Loading...</div>
+      <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+        <Navbar />
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-white">Loading...</div>
+        </div>
       </div>
     )
   }
 
-  // Only show the content if authenticated
   if (!isAuthenticated) {
     return null
   }
 
-  return (
-    <div className="max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Reminders & Notifications</h1>
-        <p className="text-gray-600 mt-2">
-          Never miss important visa appointments, deadlines, or expiry dates. Set up smart reminders that will notify you via email.
-        </p>
-      </div>
+  // Service Menu View
+  if (currentView === "menu") {
+    return (
+      <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+        {/* Font loading */}
+        <style jsx global>{`
+          @import url('https://fonts.googleapis.com/css2?family=Misto:wght@400;500;600;700&display=swap');
+          
+          .misto-font {
+            font-family: 'Misto', sans-serif;
+          }
+        `}</style>
 
-      {/* Dashboard Stats */}
-      {!loadingReminders && (
-        <ReminderDashboard reminders={reminders} />
-      )}
+        <Navbar />
+        <div className="pt-20 h-full flex flex-col">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="flex-1 flex items-center justify-center px-6"
+          >
+            <div className="max-w-7xl mx-auto">
+              {/* Service Header */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.6 }}
+                className="text-center mb-12"
+              >
+                <h1 className="text-5xl font-bold text-white mb-4 misto-font">
+                  Choose a service to get started
+                </h1>
+              </motion.div>
 
-      {/* Tab Navigation */}
-      <div className="flex space-x-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
-        <button
-          onClick={() => setActiveTab('list')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'list'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          <List className="w-4 h-4 inline mr-2" />
-          My Reminders
-        </button>
-        <button
-          onClick={() => setActiveTab('create')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'create'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          <Plus className="w-4 h-4 inline mr-2" />
-          Create New
-        </button>
-      </div>
-
-      {/* Reminders List Tab */}
-      {activeTab === 'list' && (
-        <div className="space-y-4">
-          {loadingReminders ? (
-            <Card>
-              <CardContent className="flex items-center justify-center py-8">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-                  <p>Loading reminders...</p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : reminders.length === 0 ? (
-            <Card>
-              <CardContent className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No reminders yet</h3>
-                  <p className="text-gray-600 mb-4">
-                    Create your first reminder to get started with automated notifications.
-                  </p>
-                  <Button onClick={() => setActiveTab('create')}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create First Reminder
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {reminders.map((reminder) => {
-                const IconComponent = getReminderTypeIcon(reminder.reminder_type)
-                const isOverdue = new Date(reminder.target_date) < new Date() && reminder.status === 'active'
-                
-                return (
-                  <Card key={reminder.id} className={`${isOverdue ? 'border-red-200 bg-red-50/50' : ''}`}>
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-4 flex-1">
-                          <div className={`p-2 rounded-lg ${isOverdue ? 'bg-red-100' : 'bg-gray-100'}`}>
-                            <IconComponent className={`h-5 w-5 ${getReminderTypeColor(reminder.reminder_type)}`} />
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                              {reminder.title}
-                            </h3>
-                            
-                            <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
-                              <span className="capitalize">
-                                {reminder.reminder_type.replace('_', ' ')}
-                              </span>
-                              <span className={`font-medium ${getPriorityColor(reminder.priority)}`}>
-                                {reminder.priority.toUpperCase()} Priority
-                              </span>
-                            </div>
-                            
-                            {reminder.description && (
-                              <p className="text-gray-600 mb-3 text-sm">{reminder.description}</p>
-                            )}
-                            
-                            <div className="flex items-center space-x-6 text-sm">
-                              <div className="flex items-center space-x-1">
-                                <Calendar className="h-4 w-4 text-gray-400" />
-                                <span className={isOverdue ? 'text-red-600 font-medium' : 'text-gray-600'}>
-                                  {formatDate(reminder.target_date)}
-                                  {isOverdue && ' (Overdue)'}
-                                </span>
-                              </div>
-                              
-                              <div className="flex items-center space-x-1">
-                                <Bell className="h-4 w-4 text-gray-400" />
-                                <span className="text-gray-600">
-                                  Next reminder: {formatDate(reminder.reminder_date)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2 ml-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(reminder.status)}`}>
-                            {reminder.status.charAt(0).toUpperCase() + reminder.status.slice(1)}
-                          </span>
-                          
-                          {reminder.status === 'active' && (
-                            <div className="flex space-x-1">
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => updateReminderStatus(reminder.id, 'completed')}
-                                className="text-xs"
-                              >
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Complete
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => updateReminderStatus(reminder.id, 'cancelled')}
-                                className="text-xs text-red-600 hover:text-red-700"
-                              >
-                                <Trash2 className="h-3 w-3 mr-1" />
-                                Cancel
-                              </Button>
-                            </div>
-                          )}
-                        </div>
+              {/* Service Options */}
+              <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                {/* Create Reminder Service */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.2 }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Card
+                    className="bg-white/5 backdrop-blur-sm border border-white/20 cursor-pointer hover:bg-white/10 transition-all duration-300 h-full"
+                    onClick={() => setCurrentView("create")}
+                  >
+                    <CardContent className="p-8 text-center">
+                      <div className="w-16 h-16 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Plus className="w-8 h-8 text-white/80" />
+                      </div>
+                      <h3 className="text-2xl font-semibold text-white mb-4 misto-font">
+                        Create Reminder
+                      </h3>
+                      <p className="text-gray-300 mb-6">
+                        Set up new automated reminders for your important visa-related dates and deadlines
+                      </p>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        <Badge className="bg-sky-500/20 text-sky-300 border-sky-500/30">
+                          Appointments
+                        </Badge>
+                        <Badge className="bg-blue-600/20 text-blue-400 border-blue-600/30">
+                          Visa Expiry
+                        </Badge>
+                        <Badge className="bg-violet-500/20 text-violet-300 border-violet-500/30">
+                          Consultations
+                        </Badge>
                       </div>
                     </CardContent>
                   </Card>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      )}
+                </motion.div>
 
-      {/* Create Reminder Tab */}
-      {activeTab === 'create' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Create New Reminder</CardTitle>
-            <CardDescription>
-              Set up intelligent reminders for visa appointments, document deadlines, and important dates.
-              Our system will automatically send you email notifications at optimal times.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label htmlFor="title" className="text-sm font-medium">
-                    Reminder Title *
-                  </label>
-                  <Input
-                    id="title"
-                    name="title"
-                    value={formData.title}
-                    onChange={handleInputChange}
-                    placeholder="e.g., UK Visa Appointment at Embassy"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="reminder_type" className="text-sm font-medium">
-                    Reminder Type *
-                  </label>
-                  <select
-                    id="reminder_type"
-                    name="reminder_type"
-                    value={formData.reminder_type}
-                    onChange={handleInputChange}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    required
-                  >
-                    {reminderTypes.map((type) => (
-                      <option key={type.value} value={type.value}>
-                        {type.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-gray-500">
-                    Default reminders: {getDefaultIntervals(formData.reminder_type).join(', ')} days before
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="description" className="text-sm font-medium">
-                  Description
-                </label>
-                <Textarea
-                  id="description"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  placeholder="Add any specific details, requirements, or notes..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <label htmlFor="target_date" className="text-sm font-medium">
-                    Target Date *
-                  </label>
-                  <Input
-                    id="target_date"
-                    name="target_date"
-                    type="date"
-                    value={formData.target_date}
-                    onChange={handleInputChange}
-                    min={new Date().toISOString().split('T')[0]}
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label htmlFor="target_time" className="text-sm font-medium">
-                    Target Time *
-                  </label>
-                  <Input
-                    id="target_time"
-                    name="target_time"
-                    type="time"
-                    value={formData.target_time}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="priority" className="text-sm font-medium">
-                    Priority Level
-                  </label>
-                  <select
-                    id="priority"
-                    name="priority"
-                    value={formData.priority}
-                    onChange={handleInputChange}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    {priorityLevels.map((priority) => (
-                      <option key={priority.value} value={priority.value}>
-                        {priority.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="custom_intervals" className="text-sm font-medium">
-                  Custom Reminder Schedule (Optional)
-                </label>
-                <Input
-                  id="custom_intervals"
-                  name="custom_intervals"
-                  value={formData.custom_intervals}
-                  onChange={handleInputChange}
-                  placeholder="e.g., 14,7,3,1 (days before target date)"
-                />
-                <p className="text-xs text-gray-500">
-                  Leave empty to use default schedule, or enter comma-separated days (e.g., "30,7,1" for 30 days, 7 days, and 1 day before)
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="notes" className="text-sm font-medium">
-                  Additional Notes
-                </label>
-                <Textarea
-                  id="notes"
-                  name="notes"
-                  value={formData.notes}
-                  onChange={handleInputChange}
-                  placeholder="Any additional information or instructions..."
-                  rows={2}
-                />
-              </div>
-
-              {result && (
-                <div
-                  className={`flex items-center space-x-2 p-4 rounded-lg ${
-                    result.success
-                      ? 'bg-green-50 text-green-700 border border-green-200'
-                      : 'bg-red-50 text-red-700 border border-red-200'
-                  }`}
+                {/* Manage Reminders Service */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.4 }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  {result.success ? (
-                    <CheckCircle className="h-5 w-5" />
-                  ) : (
-                    <AlertCircle className="h-5 w-5" />
-                  )}
-                  <p className="text-sm">{result.message}</p>
+                  <Card
+                    className="bg-white/5 backdrop-blur-sm border border-white/20 cursor-pointer hover:bg-white/10 transition-all duration-300 h-full"
+                    onClick={() => setCurrentView("manage")}
+                  >
+                    <CardContent className="p-8 text-center">
+                      <div className="w-16 h-16 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Users className="w-8 h-8 text-white/80" />
+                      </div>
+                      <h3 className="text-2xl font-semibold text-white mb-4 misto-font">
+                        Manage Reminders
+                      </h3>
+                      <p className="text-gray-300 mb-6">
+                        View, edit, and organise your existing reminders. Track status and update details
+                      </p>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        <Badge className="bg-yellow-500/20 text-yellow-300 border-yellow-500/30">
+                          Active: {reminders.filter(r => r.status === 'active').length}
+                        </Badge>
+                        <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
+                          Completed: {reminders.filter(r => r.status === 'completed').length}
+                        </Badge>
+                        <Badge className="bg-red-500/20 text-red-300 border-red-500/30">
+                          Urgent: {reminders.filter(r => r.priority === 'urgent').length}
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    )
+  }
+
+  // Create Reminder View
+  if (currentView === "create") {
+    return (
+      <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+        {/* Font loading */}
+        <style jsx global>{`
+          @import url('https://fonts.googleapis.com/css2?family=Misto:wght@400;500;600;700&display=swap');
+          
+          .misto-font {
+            font-family: 'Misto', sans-serif;
+          }
+        `}</style>
+
+        <div className="relative min-h-screen">
+          {/* Back Button */}
+          <div className="absolute top-6 left-6 z-10">
+            <button 
+              onClick={() => setCurrentView("menu")}
+              className="text-yellow-400 hover:text-yellow-300 transition-all duration-200"
+            >
+              <ArrowLeft
+                size={24}
+                className="drop-shadow-[0_0_8px_rgba(255,243,9,0.6)] hover:drop-shadow-[0_0_12px_rgba(255,243,9,0.8)]"
+              />
+            </button>
+          </div>
+
+          <div className="pt-20 h-full flex flex-col">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="flex-1 flex items-center justify-center px-6"
+            >
+              <div className="max-w-4xl mx-auto w-full">
+                {/* Result Message */}
+                {result && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`mb-6 p-4 rounded-lg ${
+                      result.success 
+                        ? 'bg-green-500/20 border border-green-500/30 text-green-300' 
+                        : 'bg-red-500/20 border border-red-500/30 text-red-300'
+                    }`}
+                  >
+                    {result.message}
+                  </motion.div>
+                )}
+
+                {/* Create Form */}
+                <Card className="bg-white/5 backdrop-blur-sm border border-white/20">
+                  <CardHeader>
+                    <CardTitle className="text-2xl font-semibold text-white misto-font">
+                      Create New Reminder
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Title */}
+                        <div className="space-y-2">
+                          <Label htmlFor="title" className="text-white">
+                            Reminder Title
+                          </Label>
+                          <Input
+                            id="title"
+                            value={formData.title}
+                            onChange={(e) => handleInputChange("title", e.target.value)}
+                            placeholder="e.g., Embassy Interview"
+                            className="bg-white/10 border-white/20 text-white placeholder:text-grey-400"
+                          />
+                        </div>
+
+                        {/* Reminder Type */}
+                        <div className="space-y-2">
+                          <Label htmlFor="reminderType" className="text-white">
+                            Reminder Type
+                          </Label>
+                          <Select
+                            value={formData.reminderType}
+                            onValueChange={(value) => handleInputChange("reminderType", value)}
+                          >
+                            <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                              <SelectValue placeholder="Select reminder type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {reminderTypes.map((type) => (
+                                <SelectItem key={type.value} value={type.value}>
+                                  <div className="flex items-center gap-2">
+                                    <type.icon className="w-4 h-4" />
+                                    {type.label}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Target Date */}
+                        <div className="space-y-2">
+                          <Label htmlFor="targetDate" className="text-white">
+                            Target Date
+                          </Label>
+                          <Input
+                            id="targetDate"
+                            type="date"
+                            value={formData.targetDate}
+                            onChange={(e) => handleInputChange("targetDate", e.target.value)}
+                            className="bg-white/10 border-white/20 text-white"
+                          />
+                        </div>
+
+                        {/* Target Time */}
+                        <div className="space-y-2">
+                          <Label htmlFor="targetTime" className="text-white">
+                            Target Time
+                          </Label>
+                          <Input
+                            id="targetTime"
+                            type="time"
+                            value={formData.targetTime}
+                            onChange={(e) => handleInputChange("targetTime", e.target.value)}
+                            className="bg-white/10 border-white/20 text-white"
+                          />
+                        </div>
+
+                        {/* Priority */}
+                        <div className="space-y-2">
+                          <Label htmlFor="priority" className="text-white">
+                            Priority Level
+                          </Label>
+                          <Select value={formData.priority} onValueChange={(value) => handleInputChange("priority", value)}>
+                            <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {priorityLevels.map((priority) => (
+                                <SelectItem key={priority.value} value={priority.value}>
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-3 h-3 rounded-full ${priority.colour}`} />
+                                    {priority.label}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* Description */}
+                      <div className="space-y-2">
+                        <Label htmlFor="description" className="text-white">
+                          Description
+                        </Label>
+                        <Textarea
+                          id="description"
+                          value={formData.description}
+                          onChange={(e) => handleInputChange("description", e.target.value)}
+                          placeholder="Add any additional details about this reminder..."
+                          className="bg-white/10 border-white/20 text-white placeholder:text-grey-400"
+                          rows={3}
+                        />
+                      </div>
+
+                      {/* Notes */}
+                      <div className="space-y-2">
+                        <Label htmlFor="notes" className="text-white">
+                          Notes
+                        </Label>
+                        <Textarea
+                          id="notes"
+                          value={formData.notes}
+                          onChange={(e) => handleInputChange("notes", e.target.value)}
+                          placeholder="Any personal notes or preparation items..."
+                          className="bg-white/10 border-white/20 text-white placeholder:text-grey-400"
+                          rows={2}
+                        />
+                      </div>
+
+                      {/* Submit Button */}
+                      <motion.div
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <Button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="w-full px-8 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-300 hover:to-yellow-400 text-slate-900 font-semibold text-lg disabled:opacity-50"
+                        >
+                          {isSubmitting ? "Creating..." : "Create Reminder"}
+                        </Button>
+                      </motion.div>
+                    </form>
+                  </CardContent>
+                </Card>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Manage Reminders View
+  return (
+    <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+      {/* Font loading */}
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Misto:wght@400;500;600;700&display=swap');
+        
+        .misto-font {
+          font-family: 'Misto', sans-serif;
+        }
+      `}</style>
+
+      <div className="relative min-h-screen">
+        {/* Back Button */}
+        <div className="absolute top-6 left-6 z-10">
+          <button 
+            onClick={() => setCurrentView("menu")}
+            className="text-yellow-400 hover:text-yellow-300 transition-all duration-200"
+          >
+            <ArrowLeft
+              size={24}
+              className="drop-shadow-[0_0_8px_rgba(255,243,9,0.6)] hover:drop-shadow-[0_0_12px_rgba(255,243,9,0.8)]"
+            />
+          </button>
+        </div>
+
+        <div className="pt-20 h-full flex flex-col">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex-1 px-6 py-8"
+          >
+            <div className="max-w-7xl mx-auto">
+              {/* Header */}
+              <div className="mb-8">
+                <h1 className="text-4xl font-bold text-white mb-4 misto-font">
+                  Manage Reminders
+                </h1>
+              </div>
+
+              {/* Loading State */}
+              {loadingReminders && (
+                <div className="text-center py-8">
+                  <div className="text-white">Loading reminders...</div>
                 </div>
               )}
 
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full"
-              >
-                <Bell className="mr-2 h-4 w-4" />
-                {isSubmitting ? 'Creating Reminders...' : 'Create Smart Reminders'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      )}
+              {/* Empty State */}
+              {!loadingReminders && reminders.length === 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-center py-12"
+                >
+                  <div className="bg-white/5 backdrop-blur-sm border border-white/20 rounded-2xl p-8 max-w-md mx-auto">
+                    <Bell className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-2xl font-semibold text-white mb-2 misto-font">
+                      No reminders yet
+                    </h3>
+                    <p className="text-gray-300 mb-6">
+                      Create your first reminder to get started with automated notifications
+                    </p>
+                    <Button
+                      onClick={() => setCurrentView("create")}
+                      className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-300 hover:to-yellow-400 text-slate-900 font-semibold"
+                    >
+                      Create First Reminder
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Reminders List */}
+              {!loadingReminders && reminders.length > 0 && (
+                <div className="space-y-4">
+                  {reminders.map((reminder, index) => (
+                    <motion.div
+                      key={reminder.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.5, delay: index * 0.1 }}
+                    >
+                      <Card className="bg-white/5 backdrop-blur-sm border border-white/20">
+                        <CardContent className="p-6">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h3 className="text-xl font-semibold text-white misto-font">
+                                  {reminder.title}
+                                </h3>
+                                <Badge className={`${getPriorityColour(reminder.priority)} text-white`}>
+                                  {reminder.priority}
+                                </Badge>
+                                <Badge
+                                  variant={reminder.status === "completed" ? "default" : "secondary"}
+                                  className={reminder.status === "completed" ? "bg-green-600" : "bg-blue-600"}
+                                >
+                                  {reminder.status}
+                                </Badge>
+                              </div>
+                              <p className="text-gray-300 mb-2">
+                                {reminderTypes.find((t) => t.value === reminder.reminder_type)?.label}
+                              </p>
+                              <p className="text-yellow-400 font-semibold">{formatDate(reminder.target_date)}</p>
+                              {reminder.description && (
+                                <p className="text-gray-300 mt-2">{reminder.description}</p>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              {reminder.status !== "completed" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => updateReminderStatus(reminder.id, "completed")}
+                                  className="bg-green-500/20 border-green-500/30 text-green-300 hover:bg-green-500/30"
+                                >
+                                  Complete
+                                </Button>
+                              )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                              >
+                                Edit
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      </div>
     </div>
   )
 } 

@@ -1,16 +1,18 @@
 "use client"
 
 import { MandryStarIcon } from "./mandry-icon"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 
 interface NavbarProps {
   onLogoClick?: () => void
   onChatClick?: () => void
   onAboutUsClick?: () => void
+  onScheduleClick?: () => void
   onLoginClick?: () => void
   onSignUpClick?: () => void
   showAboutUs?: boolean
   showChat?: boolean
+  showSchedule?: boolean
   className?: string
 }
 
@@ -18,13 +20,19 @@ export function Navbar({
   onLogoClick,
   onChatClick,
   onAboutUsClick,
+  onScheduleClick,
   onLoginClick,
   onSignUpClick,
   showAboutUs = true,
   showChat = true,
+  showSchedule = true,
   className = "",
 }: NavbarProps) {
   const router = useRouter()
+  const pathname = usePathname()
+
+  // Debug logging
+  console.log('Current pathname:', pathname)
 
   return (
     <nav
@@ -39,22 +47,57 @@ export function Navbar({
             <MandryStarIcon size={40} />
           </button>
 
-          {showChat && (
-            <button
-              onClick={() => router.push("/dashboard")}
-              className="text-gray-300 hover:text-white transition-colors duration-200 font-medium"
-            >
-              Chat
-            </button>
+          {showAboutUs && (
+            (pathname === '/about' || pathname.startsWith('/about')) ? (
+              <span className="text-yellow-400 font-medium cursor-default">
+                About Us
+              </span>
+            ) : (
+              <button
+                onClick={() => router.push("/about")}
+                className="text-gray-300 hover:text-white transition-colors duration-200 font-medium"
+              >
+                About Us
+              </button>
+            )
           )}
 
-          {showAboutUs && (
-            <button
-              onClick={() => router.push("/about")}
-              className="text-gray-300 hover:text-white transition-colors duration-200 font-medium"
-            >
-              About Us
-            </button>
+          {showAboutUs && showChat && (
+            <span className="text-yellow-400/60">|</span>
+          )}
+
+          {showChat && (
+            (pathname === '/dashboard' || pathname.startsWith('/dashboard')) ? (
+              <span className="text-yellow-400 font-medium cursor-default">
+                Chat
+              </span>
+            ) : (
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="text-gray-300 hover:text-white transition-colors duration-200 font-medium"
+              >
+                Chat
+              </button>
+            )
+          )}
+
+          {showChat && showSchedule && (
+            <span className="text-yellow-400/60">|</span>
+          )}
+
+          {showSchedule && (
+            (pathname === '/reminders' || pathname.startsWith('/reminders')) ? (
+              <span className="text-yellow-400 font-medium cursor-default">
+                Schedule
+              </span>
+            ) : (
+              <button
+                onClick={() => router.push("/reminders")}
+                className="text-gray-300 hover:text-white transition-colors duration-200 font-medium"
+              >
+                Schedule
+              </button>
+            )
           )}
         </div>
 
