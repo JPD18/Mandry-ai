@@ -37,4 +37,14 @@ class UserSignupSerializer(serializers.Serializer):
 
 class UserLoginSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
-    password = serializers.CharField(write_only=True) 
+    password = serializers.CharField(write_only=True)
+
+
+class DocumentProcessSerializer(serializers.Serializer):
+    file = serializers.FileField()
+    document_type = serializers.CharField(max_length=100, required=False, default='document')
+
+
+class TextValidationSerializer(serializers.Serializer):
+    text = serializers.CharField()
+    document_type = serializers.CharField(max_length=100, required=False, default='document') 
