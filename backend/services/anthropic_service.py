@@ -11,6 +11,10 @@ import json
 from typing import Dict, Any, List, Optional
 import requests
 from django.conf import settings
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -18,14 +22,15 @@ logger = logging.getLogger(__name__)
 class AnthropicLLMService:
     """Service for interacting with Anthropic's Claude API"""
     
-    def __init__(self, api_key: str = None, model: str = None, timeout: int = 30):
+    def __init__(self, api_key: str = None, model_name: str = None, timeout: int = 30):
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
-        self.model = model or os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
+        self.model = model_name or os.getenv("ANTHROPIC_MODEL", "claude-3-haiku-20240307")
         self.timeout = timeout
         self.base_url = "https://api.anthropic.com/v1/messages"
         
         if not self.api_key:
-            raise ValueError("Anthropic API key is required. Set ANTHROPIC_API_KEY environment variable.")
+            logger.warning("Could not initialize Anthropic LLM service: Anthropic API key is required. Set ANTHROPIC_API_KEY environment variable.")
+            return
         
         self.headers = {
             'Content-Type': 'application/json',
@@ -35,65 +40,77 @@ class AnthropicLLMService:
     
     def call(
         self,
-        system_prompt: str = None,
-        user_message: str = None,
-        extra_params: Dict[str, Any] = None,
+        system_prompt: str | None = None,
+        user_message: str | None = None,
+        extra_params: Dict[str, Any] | None = None,
     ) -> str:
+        """High-level convenience wrapper for Anthropic chat-completion endpoints.
+
+        Typical usage (legacy):
+            call("You are…", "Hello")
+
+        Advanced usage (new):
+            messages = [...]
+            call(extra_params={"messages": messages})
+
+        If *extra_params* contains a pre-built ``messages`` list, that list will
+        be sent *verbatim* and *system_prompt* / *user_message* are ignored.
         """
-        Make a call to Anthropic's Claude API
         
-        Args:
-            system_prompt: System prompt to set context
-            user_message: User's message 
-            extra_params: Additional parameters for the API call
-        
-        Returns:
-            The AI response as a string
-        """
+        if not self.api_key:
+            raise ValueError("Anthropic API key is required. Set ANTHROPIC_API_KEY environment variable.")
+
         extra_params = extra_params or {}
-        
-        # Build messages array
-        messages = []
-        
-        # Add user message (combining system and user if needed)
-        if user_message:
-            messages.append({
-                "role": "user",
-                "content": user_message
-            })
-        elif system_prompt:
-            # If only system prompt, treat it as user message
-            messages.append({
-                "role": "user", 
-                "content": system_prompt
-            })
-        
-        # Build payload
-        payload = {
-            "model": self.model,
-            "max_tokens": extra_params.get("max_tokens", 1000),
-            "temperature": extra_params.get("temperature", 0.7),
-            "messages": messages
-        }
-        
-        # Add system prompt if provided and we have a user message
-        if system_prompt and user_message:
-            payload["system"] = system_prompt
-        
+
+        # If caller already built the full "messages" array, trust it.
+        if "messages" in extra_params:
+            payload = {
+                "model": self.model,
+                "max_tokens": extra_params.get("max_tokens", 1000),
+                "temperature": extra_params.get("temperature", 0.7),
+            }
+            # Use the pre-built messages
+            payload["messages"] = extra_params["messages"]
+            
+            # Handle system prompt if provided separately
+            if "system" in extra_params:
+                payload["system"] = extra_params["system"]
+            elif system_prompt:
+                payload["system"] = system_prompt
+                
+        else:
+            # Legacy 2-string interface
+            payload = {
+                "model": self.model,
+                "max_tokens": extra_params.get("max_tokens", 1000),
+                "temperature": extra_params.get("temperature", 0.7),
+                "messages": [
+                    {"role": "user", "content": user_message or ""}
+                ]
+            }
+            
+            # Add system prompt if provided
+            if system_prompt:
+                payload["system"] = system_prompt
+            
+            # Override with any extra params (but preserve messages structure)
+            for key, value in extra_params.items():
+                if key not in ["messages", "system"]:
+                    payload[key] = value
+
         try:
             logger.info(f"Making request to Anthropic API with model: {self.model}")
             
-            response = requests.post(
-                self.base_url,
-                json=payload,
+            resp = requests.post(
+                self.base_url, 
+                json=payload, 
                 headers=self.headers,
                 timeout=self.timeout
             )
+            resp.raise_for_status()
+            data = resp.json()
             
-            response.raise_for_status()
-            data = response.json()
-            
-            # Extract content from Claude's response format
+            # Handle Anthropic API response format
             if 'content' in data and len(data['content']) > 0:
                 return data['content'][0]['text'].strip()
             else:
@@ -112,7 +129,7 @@ class AnthropicLLMService:
                 f"AnthropicLLMService ➔ Invalid response format: {e}\n"
                 f"  URL:    {self.base_url}\n"
                 f"  MODEL:  {self.model}\n"
-                f"  Response: {response.text if 'response' in locals() else 'No response'}"
+                f"  Response: {resp.text if 'resp' in locals() else 'No response'}"
             )
             raise
     
@@ -174,10 +191,10 @@ class AnthropicLLMService:
     
     def extract_json_from_response(self, response: str) -> Dict[str, Any]:
         """
-        Extract JSON from Claude's response, handling various formats
+        Extract JSON from Anthropic's response, handling various formats
         
         Args:
-            response: The raw response from Claude
+            response: The raw response from Anthropic
             
         Returns:
             Parsed JSON as dictionary
@@ -199,13 +216,14 @@ class AnthropicLLMService:
                 # Try to find JSON-like content
                 json_str = response.strip()
             
-            # Parse JSON
+            # Try to parse as JSON
             return json.loads(json_str)
             
-        except (json.JSONDecodeError, ValueError) as e:
-            logger.warning(f"Failed to extract JSON from response: {e}")
-            logger.warning(f"Response was: {response}")
-            raise ValueError(f"Could not parse JSON from response: {e}")
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON from response: {e}")
+            logger.error(f"Response was: {response}")
+            # Return a default structure
+            return {"error": "Failed to parse JSON", "raw_response": response}
     
     def call_for_json(
         self,
@@ -214,19 +232,32 @@ class AnthropicLLMService:
         extra_params: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """
-        Make a call expecting JSON response and parse it
+        Make a call expecting JSON response from Anthropic
         
         Args:
-            system_prompt: System prompt requesting JSON response
-            user_message: User message
-            extra_params: Additional parameters
-            
+            system_prompt: System prompt to set context
+            user_message: User's message 
+            extra_params: Additional parameters for the API call
+        
         Returns:
-            Parsed JSON response as dictionary
+            Parsed JSON as dictionary
         """
-        response = self.call(system_prompt, user_message, extra_params)
+        extra_params = extra_params or {}
+        
+        # Enhance system prompt to request JSON
+        json_system_prompt = f"{system_prompt}\n\nPlease respond with valid JSON only."
+        
+        response = self.call(
+            system_prompt=json_system_prompt,
+            user_message=user_message,
+            extra_params=extra_params
+        )
+        
         return self.extract_json_from_response(response)
 
+
+# Export a singleton for convenience
+anthropic_llm = AnthropicLLMService()
 
 # Create default instance
 try:
