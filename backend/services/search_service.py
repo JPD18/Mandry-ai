@@ -21,28 +21,28 @@ def extract_main_query(user_question: str) -> str:
     """Extract the main search query from user's question and ensure it's UK-focused for better RAG results"""
     from services.llm_service import default_llm
     try:
-        uk_focused_prompt = f"""Convert this user question into a UK-focused search query for finding official UK government information.
+        uk_focused_prompt = f"""Convert this text into a UK-focused search question for finding official UK government information.
 
         INSTRUCTIONS:
         1. Keep the main subject and intent of the original question
         2. Add "UK" or "United Kingdom" context where appropriate
         3. Focus on UK government sources and UK-specific information
-        4. Make it a concise search query (not a full question)
+        4. Make it a concise search question THAT FRAMES THE QUERY AS A QUESTION e.g. what is where are who is etc
         5. If it's already UK-focused, improve the search terms
         6. keep it 100 tokens max
         Original question: "{user_question}"
 
-        Return only the UK-focused search query, nothing else."""
+        Return only the UK-focused search question, nothing else."""
 
         uk_query = default_llm.call(
             uk_focused_prompt,
             "",
             extra_params={
-                "max_tokens": 50,
+                "max_tokens": 100,
                 "temperature": 0.1
             }
         ).strip()
-
+        logger.info(f"LLM converted query: '{user_question}' -> '{uk_query}'")
         if not uk_query or len(uk_query) < 5:
             raise Exception("LLM returned empty or too short query")
         logger.info(f"LLM converted query: '{user_question}' -> '{uk_query}'")
@@ -50,14 +50,7 @@ def extract_main_query(user_question: str) -> str:
     except Exception as e:
         logger.warning(f"LLM query conversion failed: {str(e)}, falling back to manual processing")
         question_lower = user_question.lower().strip()
-        question_starters = [
-            "what is", "what are", "how do i", "how to", "can i", "do i need",
-            "tell me about", "explain", "help me with", "i need to know about"
-        ]
-        for starter in question_starters:
-            if question_lower.startswith(starter):
-                question_lower = question_lower[len(starter):].strip()
-                break
+     
         query = question_lower.replace("?", "").strip()
         if not any(uk_term in query for uk_term in ['uk', 'united kingdom', 'britain', 'british']):
             query = f"UK {query}"
@@ -71,8 +64,9 @@ def valyu_search(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
     """Search using Valyu API and return normalized results for RAG"""
     try:
         from valyu import Valyu  # type: ignore
-        api_key = os.getenv('VALYU_API_KEY', 'uEYmO9R7sN8xedZmtYP38qxutV4MD69afLuXWDK2')
+        api_key = os.getenv('VALYU_API_KEY', 'KctkEVR69Xaug36lCfW4kngBvEnUzS81a7yT7wd7')
         valyu = Valyu(api_key=api_key)
+    
         response = valyu.search(
             query,
             search_type="web",
@@ -178,6 +172,7 @@ def create_rag_context(query: str, max_sources: int = 3) -> str:
 def get_rag_context_and_sources(user_question: str, max_sources: int = 3) -> tuple[str, List[Dict[str, Any]]]:
     try:
         search_query = extract_main_query(user_question)
+        logger.info(f"Search query: {search_query}")
         search_results = valyu_search(search_query, max_sources)
         if not search_results:
             logger.warning("No search results found, using fallback sources")
@@ -199,6 +194,7 @@ def get_rag_context_and_sources(user_question: str, max_sources: int = 3) -> tup
 
 
 def get_rag_enhanced_prompt_with_sources(user_question: str, max_sources: int = 3) -> tuple[str, List[Dict[str, Any]]]:
+    logger.info(f"Getting RAG enhanced prompt with sources for user question: {user_question}")
     rag_context, sources = get_rag_context_and_sources(user_question, max_sources)
     enhanced_prompt = f"""You are a knowledgeable travel and visa assistant for the united kingdom with access to official sources.
 

@@ -638,6 +638,8 @@ def langgraph_chat(request):
                 'context_sufficient': result['context_sufficient'],
                 'missing_context_areas': result['missing_context_areas'],
                 'session_data': result['session_data'],
+                'citations': result.get('citations', []),
+                'source_count': result.get('source_count', len(result.get('citations', []))),
                 'session_state': session_state_out,
                 'message_history': result['message_history']
             }, status=status.HTTP_200_OK)
