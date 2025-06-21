@@ -32,24 +32,30 @@ export function CitationList({ citations, ragVerified = true }: CitationProps) {
       
       <div className="space-y-3">
         {citations.map((citation, index) => (
-          <Card key={index} className="border-l-4 border-l-blue-500">
+          <Card key={index} id={`cite-${index + 1}`} className="border-l-4 border-l-blue-500">
             <CardContent className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-gray-900 mb-1">
+                  <h4 className="font-medium text-white mb-1">
                     {citation.title}
                   </h4>
-                  <p className="text-sm text-gray-600 mb-2 line-clamp-3">
+                  <p className="text-sm text-white mb-2 line-clamp-3">
                     {citation.snippet}
                   </p>
                   <a
                     href={citation.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                    className="inline-flex items-center gap-1 text-sm text-blue-300 hover:text-blue-500 hover:underline"
                   >
                     View Source
                     <ExternalLink className="h-3 w-3" />
+                  </a>
+                  <a
+                    href={`#ref-${index + 1}`}
+                    className="ml-3 text-xs text-white/70 hover:text-white"
+                  >
+                    ↩︎ back
                   </a>
                 </div>
                 <div className="flex-shrink-0 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
