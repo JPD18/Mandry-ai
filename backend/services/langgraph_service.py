@@ -42,8 +42,13 @@ Analyze the user's message and extract the following information if present:
 - destination_country: Which country they want to visit/move to
 - timeline: When they plan to travel/apply
 - specific_concerns: Any specific questions or concerns mentioned
+- background: Educational/professional background, experience, qualifications
+- purpose_details: Specific purpose or reason for the visa application
+- duration: How long they plan to stay
+- previous_experience: Any previous visa applications or travel history
 
-Only extract information that is clearly stated or strongly implied. Don't make assumptions."""
+Only extract information that is clearly stated or strongly implied. Don't make assumptions.
+Focus on capturing any additional context that would help understand their visa situation better."""
 
             user_prompt = f"""User message: "{message}"
 
@@ -64,7 +69,7 @@ Extract any new information from this message."""
             # Validate and clean the extraction result
             cleaned_result = {}
             if isinstance(extraction_result, dict):
-                for key in ["nationality", "visa_intent", "current_location", "destination_country", "timeline", "specific_concerns"]:
+                for key in ["nationality", "visa_intent", "current_location", "destination_country", "timeline", "specific_concerns", "background", "purpose_details", "duration", "previous_experience"]:
                     if key in extraction_result and extraction_result[key] and extraction_result[key].lower() not in ["not specified", "none", "n/a", ""]:
                         cleaned_result[key] = extraction_result[key]
             
@@ -158,6 +163,34 @@ Extract any new information from this message."""
                 else:
                     profile.conversation_insights = f"- {timeline_info}"
                 updated = True
+        
+        # Build profile context from any additional details provided
+        additional_fields = ['timeline', 'specific_concerns', 'background', 'purpose_details', 'duration', 'previous_experience']
+        if any(extraction_result.get(field) for field in additional_fields):
+            # If we have additional context details, build profile context
+            context_parts = []
+            if extraction_result.get('timeline'):
+                context_parts.append(f"Timeline: {extraction_result['timeline']}")
+            if extraction_result.get('specific_concerns'):
+                context_parts.append(f"Concerns: {extraction_result['specific_concerns']}")
+            if extraction_result.get('background'):
+                context_parts.append(f"Background: {extraction_result['background']}")
+            if extraction_result.get('purpose_details'):
+                context_parts.append(f"Purpose: {extraction_result['purpose_details']}")
+            if extraction_result.get('duration'):
+                context_parts.append(f"Duration: {extraction_result['duration']}")
+            if extraction_result.get('previous_experience'):
+                context_parts.append(f"Experience: {extraction_result['previous_experience']}")
+            
+            if context_parts and not profile.profile_context:
+                profile.profile_context = "; ".join(context_parts)
+                updated = True
+            elif context_parts and profile.profile_context:
+                # Append new context to existing
+                new_context = "; ".join(context_parts)
+                if new_context not in profile.profile_context:
+                    profile.profile_context += f"; {new_context}"
+                    updated = True
         
         # Only save if we actually updated something
         if updated:
@@ -461,33 +494,48 @@ Generate a response confirming you understand their situation and are ready to h
     def _generate_context_follow_up(self, profile: UserProfile, message: str, extraction_result: Dict[str, Any]) -> str:
         """Generate intelligent follow-up questions for missing context"""
         
-        system_prompt = """You are Mandry AI, a direct visa consultant assistant gathering information from a new user.
-        
-        Generate a response that:
-        1. Directly asks for the missing information you need
-        2. Be specific - ask for nationality and/or visa type directly
-        3. No acknowledgments of what they've shared
-        4. No explanations about why you need the information
-        5. No reassurances or encouraging language
-        
-        Be direct and brief (1 sentence maximum)."""
-        
+        # Determine what's specifically missing
         missing_info = []
         if not profile.nationality:
-            missing_info.append("nationality/citizenship")
+            missing_info.append("nationality")
         if not profile.visa_intent:
-            missing_info.append("type of visa you're interested in")
+            missing_info.append("visa type")
+        if not profile.current_location:
+            missing_info.append("current location")
+        if not profile.destination_country:
+            missing_info.append("destination country")
+        if not (profile.profile_context or profile.structured_data):
+            missing_info.append("additional details")
+        
+        # Generate specific question based on what's missing
+        if "additional details" in missing_info and len(missing_info) == 1:
+            # Only additional context missing - ask for specific details about their situation
+            return "Tell me more about your specific situation - when do you plan to apply, what's your background, any specific concerns?"
+        elif "nationality" in missing_info:
+            return "What's your nationality?"
+        elif "visa type" in missing_info:
+            return "What type of visa do you need?"
+        elif "current location" in missing_info:
+            return "Where are you currently located?"
+        elif "destination country" in missing_info:
+            return "Which country do you want to go to?"
+        
+        # Fallback to AI generation for complex cases
+        system_prompt = """You are Mandry AI, a direct visa consultant assistant gathering information from a new user.
+        
+        Ask ONLY for the specific missing information. Be direct and brief (1 sentence maximum).
+        Do NOT repeat questions about information already provided."""
         
         user_prompt = f"""Current Profile:
-- Nationality: {profile.nationality or 'Not provided'}
-- Visa Interest: {profile.visa_intent or 'Not provided'}
-- Current Location: {profile.current_location or 'Not provided'}
+- Nationality: {profile.nationality or 'Missing'}
+- Visa Interest: {profile.visa_intent or 'Missing'}
+- Current Location: {profile.current_location or 'Missing'}
+- Destination Country: {profile.destination_country or 'Missing'}
+- Additional Details: {'Provided' if (profile.profile_context or profile.structured_data) else 'Missing'}
 
-User's latest message: "{message}"
-Information just extracted: {extraction_result}
 Still missing: {', '.join(missing_info)}
 
-Generate a natural follow-up response asking for the missing information."""
+Ask for the specific missing information. Do not repeat questions about information already provided."""
         
         response = anthropic_llm.call(
             system_prompt=system_prompt,

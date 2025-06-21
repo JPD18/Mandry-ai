@@ -97,12 +97,18 @@ class UserProfile(models.Model):
     
     def get_context_completeness(self):
         """Get context completeness percentage based on core elements"""
-        core_elements = [self.nationality, self.visa_intent]
-        additional_context = bool(self.profile_context or self.structured_data)
-        
         score = 0
-        if self.nationality: score += 40
-        if self.visa_intent: score += 40
+        if self.nationality: score += 25
+        if self.visa_intent: score += 25
+        if self.current_location: score += 15
+        if self.destination_country: score += 15
+        
+        # Additional context: conversation_insights OR structured_data OR profile_context
+        additional_context = bool(
+            (self.conversation_insights and self.conversation_insights.strip()) or
+            (self.structured_data and len(self.structured_data) > 0) or
+            (self.profile_context and self.profile_context.strip())
+        )
         if additional_context: score += 20
         
         return min(score, 100)

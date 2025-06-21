@@ -79,8 +79,14 @@ export function ProfileDropdown({ isExpanded, onToggle, refreshTrigger = 0 }: Pr
     if (profile.visa_intent) score += 25
     if (profile.current_location) score += 15
     if (profile.destination_country) score += 15
-    if (profile.conversation_insights) score += 10
-    if (profile.structured_data && Object.keys(profile.structured_data).length > 0) score += 10
+    
+    // Additional context: either conversation_insights OR structured_data OR profile_context
+    const hasAdditionalContext = 
+      (profile.conversation_insights && profile.conversation_insights.trim()) ||
+      (profile.structured_data && Object.keys(profile.structured_data).length > 0) ||
+      (profile.profile_context && profile.profile_context.trim())
+    
+    if (hasAdditionalContext) score += 20
     
     return Math.min(score, 100)
   }
@@ -241,6 +247,19 @@ export function ProfileDropdown({ isExpanded, onToggle, refreshTrigger = 0 }: Pr
                   </div>
                 </div>
               </div>
+
+              {/* Profile Context */}
+              {profile.profile_context && (
+                <div className="border-t pt-3">
+                  <h4 className="font-medium text-gray-700 mb-2 flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Profile Context
+                  </h4>
+                  <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                    {profile.profile_context}
+                  </div>
+                </div>
+              )}
 
               {/* Additional Context */}
               {profile.conversation_insights && (
