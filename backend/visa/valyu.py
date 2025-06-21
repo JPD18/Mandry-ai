@@ -62,7 +62,7 @@ def valyu_search(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
             search_type="web",                    # Search both proprietary and web sources
             max_num_results=top_k,               # Limit to requested number of results
             relevance_threshold=0.5,             # Only return results with >50% relevance
-            max_price=30.0,                      # Maximum cost in dollars
+            max_price=10.0,                      # Maximum cost in dollars
             is_tool_call=True                    # True for AI agents/tools
         )
         
