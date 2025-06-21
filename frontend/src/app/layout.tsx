@@ -1,12 +1,12 @@
 'use client'
 
-import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { MandryStarIcon } from '@/components/mandry-icon'
+import { AnimatePresence } from 'framer-motion'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -22,32 +22,43 @@ export default function RootLayout({
   const router = useRouter()
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
-    const storedUsername = localStorage.getItem('username')
-    
-    if (token && storedUsername) {
-      setIsAuthenticated(true)
-      setUsername(storedUsername)
+    try {
+      const token = localStorage.getItem('token')
+      const storedUsername = localStorage.getItem('username')
+      
+      if (token && storedUsername) {
+        setIsAuthenticated(true)
+        setUsername(storedUsername)
+      }
+    } catch (error) {
+      console.warn("localStorage not available:", error)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [pathname])
 
   const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user_id')
-    localStorage.removeItem('username')
+    try {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user_id')
+      localStorage.removeItem('username')
+    } catch (error) {
+      console.warn("localStorage not available:", error)
+    }
     setIsAuthenticated(false)
     setUsername('')
-    router.push('/login')
+    router.push('/')
   }
 
-  // Don't show navigation on auth pages
+  // Don't show navigation on auth pages or welcome page
   const isAuthPage = pathname === '/login' || pathname === '/signup'
+  const isHomePage = pathname === '/'
+  const isAboutPage = pathname === '/about'
 
   return (
     <html lang="en">
       <body className={inter.className}>
-        {!isAuthPage && (
+        {!isAuthPage && !isHomePage && (
           <nav className="fixed top-0 left-0 right-0 z-50 bg-black/20 backdrop-blur-md border-b border-white/10 transition-all duration-300">
             <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
               <div className="flex items-center space-x-8">
@@ -55,7 +66,7 @@ export default function RootLayout({
                   href={isAuthenticated ? "/dashboard" : "/"} 
                   className="flex items-center space-x-3 hover:opacity-80 transition-opacity duration-200"
                 >
-                  <MandryStarIcon size={40} />
+                  <MandryStarIcon size={40} uniqueId="global-nav" />
                   <span className="font-bold text-xl text-white">Mandry AI</span>
                 </Link>
                 
@@ -63,7 +74,9 @@ export default function RootLayout({
                 {pathname !== '/about' ? (
                   <Link
                     href="/about"
-                    className="text-gray-300 hover:text-white transition-colors duration-200 font-medium"
+                    className={`text-sm font-medium transition-colors hover:text-white ${
+                      isAboutPage ? "text-white/50 cursor-default" : "text-white/80"
+                    }`}
                   >
                     About Us
                   </Link>
@@ -129,9 +142,9 @@ export default function RootLayout({
                       <>
                         <Link
                           href="/login"
-                          className="text-gray-300 hover:text-white transition-colors duration-200 font-medium"
+                          className="text-sm font-medium text-white/80 transition-colors hover:text-white"
                         >
-                          Log In
+                          Login
                         </Link>
                         <Link
                           href="/signup"
@@ -143,7 +156,7 @@ export default function RootLayout({
                     ) : (
                       <>
                         <span className="text-gray-500 font-medium cursor-default">
-                          Log In
+                          Login
                         </span>
                         <span className="px-6 py-2 border-2 border-gray-600 text-gray-500 font-semibold rounded-lg cursor-default">
                           Sign Up

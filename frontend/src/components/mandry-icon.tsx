@@ -106,27 +106,31 @@ export function MandryBaseIcon({ size = 24, className = "" }: IconProps) {
   )
 }
 
-export function MandryStarIcon({ size = 24, className = "" }: IconProps) {
+export function MandryStarIcon({ size = 24, className = "", uniqueId }: IconProps & { uniqueId?: string }) {
+  const paint0 = `paint0_radial_${uniqueId || 'default'}`;
+  const paint1 = `paint1_radial_${uniqueId || 'default'}`;
+  const clip0 = `clip0_${uniqueId || 'default'}`;
+
   return (
     <div className={`inline-block ${className}`} style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <g clipPath="url(#clip0_26_75)">
+        <g clipPath={`url(#${clip0})`}>
           <path
             d="M63.3661 59.5276L63.4814 59.6277L63.5967 59.5276L93.7924 33.2072L67.4727 63.4036L67.3725 63.5189L67.4727 63.6342L94.052 94.0529L63.634 67.4729L63.5187 67.3727L63.4033 67.4729L33.2063 93.7933L59.5274 63.5969L59.6275 63.4816L59.5274 63.3663L32.9466 32.9476L63.3661 59.5276Z"
-            fill="url(#paint0_radial_26_75)"
+            fill={`url(#${paint0})`}
             stroke="#FFF309"
             strokeWidth="0.350226"
           />
           <path
             d="M68.835 57.9493L68.8535 58.0782L68.9834 58.0968L106.509 63.5695L68.9834 69.0431L68.8535 69.0616L68.835 69.1915L63.3613 106.717L57.8887 69.1915L57.8701 69.0616L57.7412 69.0431L20.2139 63.5695L57.7412 58.0968L57.8701 58.0782L57.8887 57.9493L63.3613 20.422L68.835 57.9493Z"
-            fill="url(#paint1_radial_26_75)"
+            fill={`url(#${paint1})`}
             stroke="#FFF309"
             strokeWidth="0.350226"
           />
         </g>
         <defs>
           <radialGradient
-            id="paint0_radial_26_75"
+            id={paint0}
             cx="0"
             cy="0"
             r="1"
@@ -137,7 +141,7 @@ export function MandryStarIcon({ size = 24, className = "" }: IconProps) {
             <stop offset="0.788462" stopColor="white" />
           </radialGradient>
           <radialGradient
-            id="paint1_radial_26_75"
+            id={paint1}
             cx="0"
             cy="0"
             r="1"
@@ -147,7 +151,7 @@ export function MandryStarIcon({ size = 24, className = "" }: IconProps) {
             <stop stopColor="white" />
             <stop offset="0.427885" stopColor="#FFF309" />
           </radialGradient>
-          <clipPath id="clip0_26_75">
+          <clipPath id={clip0}>
             <rect width="128" height="128" rx="19" fill="white" />
           </clipPath>
         </defs>
