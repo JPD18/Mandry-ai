@@ -13,7 +13,6 @@ from django.conf import settings
 from .models import Appointment, ActivityLog, Appointment, Reminder
 
 from .serializers import (
-    FileUploadSerializer, 
     QuestionSerializer, 
     ScheduleSerializer,
     UserSignupSerializer,

@@ -3,12 +3,6 @@ from rest_framework import serializers
 from .models import  Appointment, Reminder
 
 
-class UploadedDocumentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = UploadedDocument
-        fields = ['id', 'filename', 'uploaded_at', 'file_type']
-
-
 class ReminderSerializer(serializers.ModelSerializer):
     """Serializer for the new Reminder model"""
     class Meta:
