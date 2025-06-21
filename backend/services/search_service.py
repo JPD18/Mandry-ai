@@ -21,14 +21,12 @@ def extract_main_query(user_question: str) -> str:
     """Extract the main search query from user's question and ensure it's UK-focused for better RAG results"""
     from services.llm_service import default_llm
     try:
-        uk_focused_prompt = f"""Convert this text into a UK-focused search question for finding official UK government information.
+        uk_focused_prompt = f"""Convert this text into a  search question for finding official government information.
 
         INSTRUCTIONS:
         1. Keep the main subject and intent of the original question
-        2. Add "UK" or "United Kingdom" context where appropriate
-        3. Focus on UK government sources and UK-specific information
+        3. Focus on government sources andc information
         4. Make it a concise search question THAT FRAMES THE QUERY AS A QUESTION e.g. what is where are who is etc
-        5. If it's already UK-focused, improve the search terms
         6. keep it 100 tokens max
         Original question: "{user_question}"
 
