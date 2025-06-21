@@ -59,25 +59,31 @@ export default function RootLayout({
                     <nav className="flex items-center space-x-6 text-sm font-medium">
                       <Link
                         href="/"
-                        className="transition-colors hover:text-foreground/80 text-foreground/60"
+                        className={`transition-colors hover:text-foreground/80 ${
+                          pathname === '/' ? 'text-foreground' : 'text-foreground/60'
+                        }`}
                       >
-                        Chat
+                        AI Assistant
                       </Link>
                       <Link
                         href="/upload"
-                        className="transition-colors hover:text-foreground/80 text-foreground/60"
+                        className={`transition-colors hover:text-foreground/80 ${
+                          pathname === '/upload' ? 'text-foreground' : 'text-foreground/60'
+                        }`}
                       >
-                        Upload Documents
+                        Documents
                       </Link>
                       <Link
                         href="/reminders"
-                        className="transition-colors hover:text-foreground/80 text-foreground/60"
+                        className={`transition-colors hover:text-foreground/80 ${
+                          pathname === '/reminders' ? 'text-foreground' : 'text-foreground/60'
+                        }`}
                       >
-                        Schedule Appointment
+                        Reminders
                       </Link>
                     </nav>
                     <div className="ml-auto flex items-center space-x-4">
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-muted-foreground">
                         Welcome, {username}
                       </span>
                       <button

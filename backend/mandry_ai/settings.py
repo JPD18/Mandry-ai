@@ -145,6 +145,23 @@ CORS_ALLOWED_HEADERS = [
     'x-requested-with',
 ]
 
+# Email configuration
+if DEBUG:
+    # For development, use console backend to see emails in terminal
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+else:
+    # For production, use SMTP
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+    EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
+    EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+    EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+
+# Default email settings
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@mandry.ai')
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
 # Environment variables for external services
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 VALYU_KEY = os.getenv('VALYU_KEY')
