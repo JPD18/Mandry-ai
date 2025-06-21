@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import  Appointment, Reminder
+from .models import  Appointment, Reminder, UserProfile
 
 
 class ReminderSerializer(serializers.ModelSerializer):
