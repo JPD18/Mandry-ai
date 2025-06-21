@@ -1,5 +1,11 @@
-'use client'
+"use client"
 
+
+
+import { AnimatePresence } from "framer-motion"
+import { Splash } from "@/components/splash/splash"
+import SiteHeader from "@/components/layout/site-header"
+import MainContentComponent from "@/components/sections/main-content"
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -9,6 +15,28 @@ import { CitationList } from '@/components/ui/citation'
 import { MarkdownRenderer } from '@/components/ui/markdown-renderer'
 import { ProfileDropdown } from '@/components/ui/profile-dropdown'
 import { AlertCircle, CheckCircle, MessageSquare, User, Settings, MessageCircle } from 'lucide-react'
+
+export default function Home() {
+  const [showSplash, setShowSplash] = useState(true)
+
+  useEffect(() => {
+    // Check if this is the first visit
+    try {
+      const hasVisitedBefore = localStorage.getItem("hasVisitedBefore")
+      
+      if (hasVisitedBefore) {
+        // Returning visitor - show content immediately
+        setShowSplash(false)
+      } else {
+        // First time visitor - show splash screen
+        localStorage.setItem("hasVisitedBefore", "true")
+        // Keep splash visible - let the splash component control timing
+      }
+    } catch (error) {
+      // Fallback if localStorage is not available
+      console.warn("localStorage not available:", error)
+      setShowSplash(false)
+
 
 interface Citation {
   title: string
@@ -163,22 +191,9 @@ export default function Home() {
       setError(error instanceof Error ? error.message : 'Error: Could not get response from server')
     } finally {
       setChatLoading(false)
+
     }
-  }
-
-  // Show loading while checking authentication
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Loading...</div>
-      </div>
-    )
-  }
-
-  // Only show the main content if authenticated
-  if (!isAuthenticated) {
-    return null // This shouldn't show as we redirect above, but just in case
-  }
+  }, [])
 
   const getStepTitle = () => {
     switch (currentStep) {
@@ -226,6 +241,16 @@ export default function Home() {
   }
 
   return (
+    <>
+      <AnimatePresence>{showSplash && <Splash key="splash" onDone={() => setShowSplash(false)} />}</AnimatePresence>
+
+      {!showSplash && (
+        <>
+          <SiteHeader />
+          <MainContentComponent />
+        </>
+      )}
+    </>
     <div className="max-w-4xl mx-auto space-y-8">
       <div className="text-center space-y-4">
         <h1 className="text-4xl font-bold text-gray-900">

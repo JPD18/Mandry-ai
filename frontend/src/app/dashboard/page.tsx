@@ -1,0 +1,400 @@
+"use client"
+
+import type React from "react"
+
+import { useState, useRef } from "react"
+import { motion } from "framer-motion"
+import { Navbar } from "@/components/Navbar"
+import { MandryStarIcon } from "@/components/mandry-icon"
+import { Upload, Send } from "lucide-react"
+import { ChatInput } from "@/components/ui/chat-input"
+import { Button } from "@/components/ui/button"
+import { ChatAuthGuard } from "@/components/chat-auth-guard"
+
+interface Message {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  citations?: Array<{
+    title: string
+    url: string
+    snippet: string
+  }>
+}
+
+function ChatPageContent() {
+  const [message, setMessage] = useState("")
+  const [messages, setMessages] = useState<Message[]>([])
+  const [completionPercentage, setCompletionPercentage] = useState(75)
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleSendMessage = async () => {
+    if (message.trim() && !isLoading) {
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        role: "user",
+        content: message,
+      }
+      setMessages((prev) => [...prev, userMessage])
+      setMessage("")
+      setIsLoading(true)
+
+      try {
+        const token = localStorage.getItem("token")
+        const apiBase = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000"
+        
+        const response = await fetch(`${apiBase}/api/ask/`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Token ${token}`,
+          },
+          body: JSON.stringify({ question: message }),
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const assistantMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: data.answer,
+            citations: data.citations,
+          }
+          setMessages((prev) => [...prev, assistantMessage])
+        } else {
+          // Handle error response
+          const assistantMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "I'm sorry, I couldn't process your request. Please try again or check your authentication.",
+          }
+          setMessages((prev) => [...prev, assistantMessage])
+        }
+      } catch (error) {
+        console.error("Error sending message:", error)
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "I'm sorry, there was an error connecting to the server. Please check your internet connection and try again.",
+        }
+        setMessages((prev) => [...prev, assistantMessage])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+  }
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (files) {
+      const newFiles = Array.from(files)
+      setUploadedFiles((prev) => [...prev, ...newFiles])
+
+      // Upload files to backend
+      for (const file of newFiles) {
+        await uploadFileToBackend(file)
+      }
+    }
+  }
+
+  const uploadFileToBackend = async (file: File) => {
+    try {
+      const token = localStorage.getItem("token")
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000"
+      
+      const formData = new FormData()
+      formData.append("file", file)
+
+      const response = await fetch(`${apiBase}/api/upload/`, {
+        method: "POST",
+        headers: {
+          Authorization: `Token ${token}`,
+        },
+        body: formData,
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log("File uploaded successfully:", data)
+      } else {
+        console.error("Failed to upload file:", file.name)
+      }
+    } catch (error) {
+      console.error("Error uploading file:", error)
+    }
+  }
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  return (
+    <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+      {/* Font loading */}
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Misto:wght@400;500;600;700&display=swap');
+
+        .misto-font {
+          font-family: 'Misto', sans-serif;
+        }
+      `}</style>
+
+      {/* Navbar */}
+      <Navbar
+        onLogoClick={() => console.log("Logo clicked")}
+        onChatClick={() => console.log("Chat clicked")}
+        onAboutUsClick={() => console.log("About Us clicked")}
+        onLoginClick={() => console.log("Login clicked")}
+        onSignUpClick={() => console.log("Sign up clicked")}
+        showAboutUs={true}
+        showChat={true}
+      />
+
+      <div className="pt-20 h-full flex flex-col">
+        {/* Top Bar with Assistant Info and Completion */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="flex items-center justify-between p-6 bg-white/5 backdrop-blur-sm border-b border-white/10"
+        >
+          <div className="flex items-center space-x-4">
+            <div
+              className="w-12 h-12 rounded-full flex items-center justify-center border"
+              style={{
+                backgroundColor: "#31B8E9",
+                opacity: 0.4,
+                backdropFilter: "blur(12px)",
+                borderColor: "rgba(49, 184, 233, 0.2)",
+                boxShadow: "inset 0 0 20px rgba(255, 255, 255, 0.3), inset 0 0 40px rgba(255, 255, 255, 0.1)",
+              }}
+            ></div>
+            <div>
+              <h2 className="font-semibold text-white misto-font">Your Assistant</h2>
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <p className="text-sm text-gray-300">online</p>
+              </div>
+            </div>
+          </div>
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            className="backdrop-blur-sm px-6 py-2 rounded-full font-medium border shadow-lg"
+            style={{
+              backgroundColor: "#15AD27",
+              color: "#FFFFFF",
+              borderColor: "#15AD27",
+              boxShadow: "0 10px 15px -3px rgba(21, 173, 39, 0.25)",
+            }}
+          >
+            Completion {completionPercentage}%
+          </motion.div>
+        </motion.div>
+
+        {/* Main Content */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Chat Area */}
+          <div className="flex-1 flex flex-col">
+            {/* Messages */}
+            <div className="flex-1 p-6 overflow-y-auto">
+              {messages.length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6 }}
+                  className="flex items-center justify-center h-full"
+                >
+                  <div className="text-center bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-12 max-w-md">
+                    <MandryStarIcon size={80} className="mx-auto mb-6" />
+                    <h3 className="text-2xl font-bold text-white mb-4 misto-font">Welcome to Mandry</h3>
+                    <p className="text-gray-300">
+                      Start a conversation with your AI assistant to navigate through any challenge
+                    </p>
+                  </div>
+                </motion.div>
+              ) : (
+                <div className="space-y-6 max-w-4xl mx-auto">
+                  {messages.map((msg, index) => (
+                    <motion.div
+                      key={msg.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1, duration: 0.4 }}
+                      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                    >
+                      {msg.role === "assistant" && (
+                        <div
+                          className="w-8 h-8 rounded-full mr-3 mt-1 flex-shrink-0 border"
+                          style={{
+                            backgroundColor: "#31B8E9",
+                            opacity: 0.4,
+                            backdropFilter: "blur(12px)",
+                            borderColor: "rgba(49, 184, 233, 0.2)",
+                            boxShadow:
+                              "inset 0 0 15px rgba(255, 255, 255, 0.3), inset 0 0 30px rgba(255, 255, 255, 0.1)",
+                          }}
+                        ></div>
+                      )}
+                      <div
+                        className={`max-w-xs lg:max-w-md px-6 py-4 rounded-2xl backdrop-blur-sm border ${
+                          msg.role === "user"
+                            ? "bg-gradient-to-r from-[#FFF309]/20 to-[#FFF309]/10 text-white border-[#FFF309]/30"
+                            : "bg-white/10 text-gray-100 border-white/20"
+                        }`}
+                      >
+                        {msg.content}
+                      </div>
+                    </motion.div>
+                  ))}
+                  
+                  {/* Loading indicator */}
+                  {isLoading && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex justify-start"
+                    >
+                      <div className="w-8 h-8 rounded-full mr-3 mt-1 flex-shrink-0 border"
+                        style={{
+                          backgroundColor: "#31B8E9",
+                          opacity: 0.4,
+                          backdropFilter: "blur(12px)",
+                          borderColor: "rgba(49, 184, 233, 0.2)",
+                          boxShadow:
+                            "inset 0 0 15px rgba(255, 255, 255, 0.3), inset 0 0 30px rgba(255, 255, 255, 0.1)",
+                        }}
+                      ></div>
+                      <div className="bg-white/10 text-gray-100 border-white/20 px-6 py-4 rounded-2xl backdrop-blur-sm border">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                          <span className="text-sm">Thinking...</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Input Area */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="p-6 backdrop-blur-sm border-t border-white/10"
+            >
+              <div className="flex space-x-4 max-w-4xl mx-auto">
+                <ChatInput
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Ask Mandry"
+                  className="flex-1 backdrop-blur-sm border-white/20 rounded-xl px-6 py-4 focus:border-[#FFF309]/50 focus:ring-[#FFF309]/20 text-white placeholder:text-gray-300"
+                  style={{ background: 'transparent' }}
+                  onKeyPress={(e) => e.key === "Enter" && !isLoading && handleSendMessage()}
+                  disabled={isLoading}
+                />
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={isLoading}
+                  className="px-4 py-4 bg-gradient-to-r from-[#FFF309] to-[#FFF309]/80 hover:from-[#FFF309]/90 hover:to-[#FFF309]/70 font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-[#FFF309]/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-5 h-5 text-white" />
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Right Sidebar - Document Upload */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6 }}
+            className="w-80 bg-transparent backdrop-blur-sm border-l border-white/10 p-6 flex flex-col"
+          >
+            <div className="mb-6">
+              <h3 className="font-semibold text-white mb-3 misto-font">Upload Documents</h3>
+              <p className="text-sm text-gray-300 leading-relaxed">Supported formats: PDF, PNG, JPG (max 10MB)</p>
+            </div>
+
+            {/* Upload Area */}
+            <div className="mb-4">
+              <div className="bg-transparent backdrop-blur-sm border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-[#FFF309]/50 transition-colors duration-200">
+                <Upload className="w-8 h-8 text-[#FFF309] mx-auto mb-3" />
+                <p className="text-sm text-gray-300 mb-4">
+                  Drag and drop your file here or click the button below to select a file
+                </p>
+              </div>
+              <div className="flex justify-center">
+                <Button
+                  size="sm"
+                  onClick={handleUploadClick}
+                  className="w-full mt-3 bg-[#FFF309]/20 hover:bg-[#FFF309] hover:text-slate-900 text-[#FFF309] border-none font-medium rounded-lg transition-all duration-200"
+                >
+                  Select File
+                </Button>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={handleFileUpload}
+                className="hidden"
+                accept=".pdf,.png,.jpg,.jpeg"
+              />
+            </div>
+
+            {/* Uploaded Files List */}
+            {uploadedFiles.length > 0 && (
+              <div className="space-y-3 mb-6">
+                <h4 className="font-medium text-gray-300 text-sm">Uploaded Files:</h4>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {uploadedFiles.map((file, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: index * 0.1, duration: 0.3 }}
+                      className="bg-transparent backdrop-blur-sm p-3 rounded-lg border border-white/20"
+                    >
+                      <div className="font-medium text-white text-sm truncate">{file.name}</div>
+                      <div className="text-gray-400 text-xs">{(file.size / 1024).toFixed(1)} KB</div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Quick Actions */}
+            <div className="mt-auto pt-6 border-t border-white/10">
+              <h4 className="font-medium text-gray-300 text-sm mb-3">Quick Actions</h4>
+              <div className="space-y-2">
+                {["Analyze Document", "Summarize Content", "Extract Key Points"].map((action, index) => (
+                  <motion.button
+                    key={index}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors duration-200"
+                  >
+                    {action}
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function ChatPage() {
+  return (
+    <ChatAuthGuard>
+      <ChatPageContent />
+    </ChatAuthGuard>
+  )
+} 

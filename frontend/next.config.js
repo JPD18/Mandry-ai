@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+
   experimental: {
     appDir: true,
   },
@@ -8,6 +9,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+
 }
 
 module.exports = nextConfig 

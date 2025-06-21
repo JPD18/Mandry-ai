@@ -2,14 +2,14 @@
 import os
 import logging
 import requests
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union, Optional
 
 logger = logging.getLogger(__name__)
 
 class LLMService:
     def __init__(self,
-                 base_url: str = None,
-                 model_name: str = None,
+                 base_url: Optional[str] = None,
+                 model_name: Optional[str] = None,
                  timeout: int = 20):
         self.base_url = base_url or os.getenv("OLLAMA_URL", "http://127.0.0.1:11434/v1/chat/completions")
         self.model = model_name or os.getenv("OLLAMA_MODEL", "gemma3")
@@ -21,9 +21,9 @@ class LLMService:
 
     def call(
         self,
-        system_prompt: str | None = None,
-        user_message: str | None = None,
-        extra_params: Dict[str, Any] | None = None,
+        system_prompt: Optional[str] = None,
+        user_message: Optional[str] = None,
+        extra_params: Optional[Dict[str, Any]] = None,
     ) -> str:
         """High-level convenience wrapper for chat-completion endpoints.
 

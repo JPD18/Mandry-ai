@@ -1,11 +1,12 @@
 'use client'
 
-import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { MandryStarIcon } from '@/components/mandry-icon'
+import { AnimatePresence } from 'framer-motion'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -21,39 +22,66 @@ export default function RootLayout({
   const router = useRouter()
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
-    const storedUsername = localStorage.getItem('username')
-    
-    if (token && storedUsername) {
-      setIsAuthenticated(true)
-      setUsername(storedUsername)
+    try {
+      const token = localStorage.getItem('token')
+      const storedUsername = localStorage.getItem('username')
+      
+      if (token && storedUsername) {
+        setIsAuthenticated(true)
+        setUsername(storedUsername)
+      }
+    } catch (error) {
+      console.warn("localStorage not available:", error)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [pathname])
 
   const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user_id')
-    localStorage.removeItem('username')
+    try {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user_id')
+      localStorage.removeItem('username')
+    } catch (error) {
+      console.warn("localStorage not available:", error)
+    }
     setIsAuthenticated(false)
     setUsername('')
-    router.push('/login')
+    router.push('/')
   }
 
-  // Don't show navigation on auth pages
+  // Don't show navigation on auth pages or welcome page
   const isAuthPage = pathname === '/login' || pathname === '/signup'
+  const isHomePage = pathname === '/'
+  const isAboutPage = pathname === '/about'
 
   return (
     <html lang="en">
       <body className={inter.className}>
-        {!isAuthPage && (
-          <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="container mx-auto px-4">
-              <div className="flex h-14 items-center">
-                <Link href="/" className="mr-6 flex items-center space-x-2">
-                  <span className="font-bold text-xl">Mandry AI</span>
+        {!isAuthPage && !isHomePage && (
+          <nav className="fixed top-0 left-0 right-0 z-50 bg-black/20 backdrop-blur-md border-b border-white/10 transition-all duration-300">
+            <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center space-x-8">
+                <Link 
+                  href={isAuthenticated ? "/dashboard" : "/"} 
+                  className="flex items-center space-x-3 hover:opacity-80 transition-opacity duration-200"
+                >
+                  <MandryStarIcon size={40} uniqueId="global-nav" />
+                  <span className="font-bold text-xl text-white">Mandry AI</span>
                 </Link>
                 
+
+                {/* About Us Button */}
+                {pathname !== '/about' ? (
+                  <Link
+                    href="/about"
+                    className={`text-sm font-medium transition-colors hover:text-white ${
+                      isAboutPage ? "text-white/50 cursor-default" : "text-white/80"
+                    }`}
+                  >
+                    About Us
+                  </Link>
+
                 {isAuthenticated ? (
                   <>
                     <nav className="flex items-center space-x-6 text-sm font-medium">
@@ -94,27 +122,97 @@ export default function RootLayout({
                       </button>
                     </div>
                   </>
+
                 ) : (
-                  <div className="ml-auto flex items-center space-x-4">
+                  <span className="text-gray-500 font-medium cursor-default">
+                    About Us
+                  </span>
+                )}
+                
+                {isAuthenticated && (
+                  <nav className="flex items-center space-x-6 text-sm font-medium">
                     <Link
-                      href="/login"
-                      className="transition-colors hover:text-foreground/80 text-foreground/60"
+                      href="/dashboard"
+                      className={`transition-colors duration-200 ${
+                        pathname === '/dashboard' 
+                          ? "text-gray-500 cursor-default" 
+                          : "text-gray-300 hover:text-white"
+                      }`}
                     >
-                      Login
+                      Chat
                     </Link>
                     <Link
-                      href="/signup"
-                      className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-3"
+                      href="/upload"
+                      className={`transition-colors duration-200 ${
+                        pathname === '/upload' 
+                          ? "text-gray-500 cursor-default" 
+                          : "text-gray-300 hover:text-white"
+                      }`}
                     >
-                      Sign Up
+                      Upload Documents
                     </Link>
-                  </div>
+                    <Link
+                      href="/reminders"
+                      className={`transition-colors duration-200 ${
+                        pathname === '/reminders' 
+                          ? "text-gray-500 cursor-default" 
+                          : "text-gray-300 hover:text-white"
+                      }`}
+                    >
+                      Schedule Appointment
+                    </Link>
+                  </nav>
+                )}
+              </div>
+
+              {/* Auth Buttons */}
+              <div className="flex items-center space-x-4">
+                {isAuthenticated ? (
+                  <>
+                    <span className="text-gray-300 text-sm">
+                      Welcome, {username}
+                    </span>
+                    <button
+                      onClick={handleLogout}
+                      className="px-4 py-2 border border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white font-medium rounded-lg transition-all duration-200"
+                    >
+                      Logout
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {pathname !== '/login' && pathname !== '/signup' ? (
+                      <>
+                        <Link
+                          href="/login"
+                          className="text-sm font-medium text-white/80 transition-colors hover:text-white"
+                        >
+                          Login
+                        </Link>
+                        <Link
+                          href="/signup"
+                          className="px-6 py-2 border-2 border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-slate-900 font-semibold rounded-lg transition-all duration-200 hover:scale-105"
+                        >
+                          Sign Up
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-gray-500 font-medium cursor-default">
+                          Login
+                        </span>
+                        <span className="px-6 py-2 border-2 border-gray-600 text-gray-500 font-semibold rounded-lg cursor-default">
+                          Sign Up
+                        </span>
+                      </>
+                    )}
+                  </>
                 )}
               </div>
             </div>
           </nav>
         )}
-        <main className={isAuthPage ? "" : "container mx-auto px-4 py-6"}>
+        <main className={isAuthPage ? "" : "pt-20"}>
           {children}
         </main>
       </body>
