@@ -24,6 +24,10 @@ from .serializers import (
 from services.llm_service import default_llm, LLMService
 from services.document_service import default_document_service, DocumentProcessingException
 from services.schedule_service import default_schedule_service, ScheduleServiceException
+from services.search_service import (
+    get_rag_enhanced_prompt_with_sources,
+    SearchServiceException as ValyuAPIException,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -116,8 +120,6 @@ def ask_question(request):
     POST /api/ask - Body {question}; return {answer, citations}
     RAG-verified with Valyu Search API against gov.uk and other official sources
     """
-    from .valyu import get_rag_enhanced_prompt_with_sources, ValyuAPIException
-    
     serializer = QuestionSerializer(data=request.data)
     if serializer.is_valid():
         question = serializer.validated_data['question']
