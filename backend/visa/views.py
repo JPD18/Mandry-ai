@@ -19,6 +19,7 @@ from .serializers import (
     UserLoginSerializer
 )
 from services.llm_service import default_llm, LLMService
+from services.document_service import default_document_service, DocumentProcessingException
 
 logger = logging.getLogger(__name__)
 
@@ -264,4 +265,127 @@ def logout(request):
     except Exception as e:
         return Response({
             'error': 'Failed to logout'
-        }, status=status.HTTP_400_BAD_REQUEST) 
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def process_document(request):
+    """
+    POST /api/process-document - Process uploaded document without storing
+    Extracts text and validates document using LLM
+    Body: {file, document_type (optional)}
+    Returns: {is_valid, reason, extracted_text, metadata}
+    """
+    try:
+        # Check if file is provided
+        if 'file' not in request.FILES:
+            return Response(
+                {'error': 'No file provided'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        uploaded_file = request.FILES['file']
+        document_type = request.data.get('document_type', 'document')
+        
+        # Validate file type
+        file_extension = uploaded_file.name.split('.')[-1].lower()
+        if file_extension not in ['pdf', 'png', 'jpg', 'jpeg']:
+            return Response(
+                {'error': 'Only PDF, PNG, and JPG files are allowed'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Process document using the document service
+        logger.info(f"Processing {file_extension} document for user {request.user.username}")
+        
+        result = default_document_service.process_document(
+            uploaded_file, 
+            file_extension,
+            document_type
+        )
+        
+        # Return processing results
+        response_data = {
+            'is_valid': result['validation']['is_valid'],
+            'reason': result['validation']['reason'],
+            'extracted_text': result['extracted_text'],
+            'metadata': result['metadata'],
+            'processing_successful': True
+        }
+        
+        logger.info(f"Document processing completed for user {request.user.username}. Valid: {result['validation']['is_valid']}")
+        
+        return Response(response_data, status=status.HTTP_200_OK)
+        
+    except DocumentProcessingException as e:
+        logger.error(f"Document processing failed: {str(e)}")
+        return Response(
+            {
+                'error': str(e),
+                'processing_successful': False
+            }, 
+            status=e.status_code
+        )
+    
+    except Exception as e:
+        logger.error(f"Unexpected error in document processing: {str(e)}")
+        return Response(
+            {
+                'error': 'Internal server error during document processing',
+                'processing_successful': False
+            }, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def validate_text(request):
+    """
+    POST /api/validate-text - Validate text content using LLM
+    Body: {text, document_type (optional)}
+    Returns: {is_valid, reason}
+    """
+    try:
+        # Check if text is provided
+        if 'text' not in request.data:
+            return Response(
+                {'error': 'No text provided'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        text_content = request.data['text']
+        document_type = request.data.get('document_type', 'document')
+        
+        # Validate text length
+        if not text_content.strip():
+            return Response(
+                {'error': 'Empty text provided'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Use document service to validate text
+        logger.info(f"Validating text content for user {request.user.username}")
+        
+        validation_result = default_document_service.validate_document_with_llm(
+            text_content, 
+            document_type
+        )
+        
+        logger.info(f"Text validation completed for user {request.user.username}. Valid: {validation_result['is_valid']}")
+        
+        return Response(validation_result, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Text validation failed: {str(e)}")
+        return Response(
+            {
+                'error': 'Text validation failed',
+                'is_valid': False,
+                'reason': 'Validation service temporarily unavailable'
+            }, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        ) 

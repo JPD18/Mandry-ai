@@ -6,6 +6,8 @@ urlpatterns = [
     path('login/', views.login, name='login'),
     path('logout/', views.logout, name='logout'),
     path('upload/', views.upload_document, name='upload_document'),
+    path('process-document/', views.process_document, name='process_document'),
+    path('validate-text/', views.validate_text, name='validate_text'),
     path('ask/', views.ask_question, name='ask_question'),
     path('schedule/', views.schedule_appointment, name='schedule_appointment'),
 ] 
