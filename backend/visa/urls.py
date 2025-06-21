@@ -17,4 +17,6 @@ urlpatterns = [
     
     # Legacy endpoint (deprecated)
     path('schedule/', views.schedule_appointment, name='schedule_appointment'),
+    path('profile/', views.user_profile, name='user_profile'),
+    path('chat/', views.langgraph_chat, name='langgraph_chat'),
 ] 

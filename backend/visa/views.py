@@ -10,13 +10,15 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.conf import settings
 
-from .models import Appointment, ActivityLog, Appointment, Reminder
+from .models import Appointment, ActivityLog, Appointment, UserProfile, Reminder
 
 from .serializers import (
     QuestionSerializer, 
     ScheduleSerializer,
     UserSignupSerializer,
     UserLoginSerializer,
+    UserProfileSerializer,
+    LangGraphChatSerializer,
     ReminderSerializer,
     CreateReminderSerializer,
     UpdateReminderStatusSerializer
@@ -548,4 +550,103 @@ def validate_text(request):
                 'reason': 'Validation service temporarily unavailable'
             }, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        ) 
+        )
+        
+        
+        
+@api_view(['GET', 'PUT', 'DELETE'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def user_profile(request):
+    """
+    GET /api/profile - Get user profile
+    PUT /api/profile - Update user profile
+    DELETE /api/profile - Clear user profile
+    """
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+    
+    if request.method == 'GET':
+        serializer = UserProfileSerializer(profile)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    elif request.method == 'PUT':
+        serializer = UserProfileSerializer(profile, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        # Clear all profile data while keeping the profile object
+        profile.nationality = ''
+        profile.current_location = ''
+        profile.destination_country = ''
+        profile.visa_intent = ''
+        profile.structured_data = {}
+        profile.profile_context = ''
+        profile.conversation_insights = ''
+        profile.missing_context = []
+        profile.context_sufficient = False
+        profile.last_context_assessment = None
+        profile.save()
+        
+        return Response({
+            'message': 'Profile cleared successfully'
+        }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def langgraph_chat(request):
+    """
+    POST /api/chat - LangGraph-powered visa assistant chat
+    Body: {message, session_state?}
+    Returns: {response, current_step, profile_complete, session_state}
+    """
+    from services.langgraph_service import visa_assistant_workflow
+    
+    serializer = LangGraphChatSerializer(data=request.data)
+    if serializer.is_valid():
+        message = serializer.validated_data['message']
+        session_state = serializer.validated_data.get('session_state')
+        
+        try:
+            # Handle special "start" message for initial bot greeting
+            if message.lower() == "start":
+                # Convert to a more natural initial message that triggers greeting
+                message = "Hello, I'm new here and need help with visa information."
+            
+            # Process message through LangGraph workflow
+            result = visa_assistant_workflow.process_message(
+                user_id=request.user.id,
+                message=message,
+                current_state=session_state
+            )
+            
+            # Build session_state for client to send back next time
+            session_state_out = {
+                'current_step': result['current_step'],
+                'message_history': result['message_history']
+            }
+            if result.get('last_question'):
+                session_state_out['last_question'] = result['last_question']
+
+            return Response({
+                'response': result['response'],
+                'current_step': result['current_step'],
+                'context_sufficient': result['context_sufficient'],
+                'missing_context_areas': result['missing_context_areas'],
+                'session_data': result['session_data'],
+                'session_state': session_state_out,
+                'message_history': result['message_history']
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"LangGraph chat error: {e}")
+            return Response({
+                'error': 'Sorry, I encountered an error processing your message. Please try again.',
+                'current_step': 'error'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST) 
