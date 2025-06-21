@@ -180,3 +180,4 @@ class LLMService:
 # you can export a singleton for convenience
 default_llm = LLMService()
 
+RAG PROMPT-  create a rag based on this search, so extracting the main query from the users question, sending it to the valyu api, and feeding its response to the llm to enrich its context

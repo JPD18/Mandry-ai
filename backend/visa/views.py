@@ -138,26 +138,77 @@ def upload_document(request):
 def ask_question(request):
     """
     POST /api/ask - Body {question}; return {answer, citations}
+    RAG-verified with Valyu Search API against gov.uk and other official sources
     """
+    from .valyu import valyu_search, get_rag_enhanced_prompt, ValyuAPIException
+    
     serializer = QuestionSerializer(data=request.data)
     if serializer.is_valid():
         question = serializer.validated_data['question']
         
+        try:
+            # Get enhanced RAG prompt with Valyu search context
+            logger.info(f"Creating RAG-enhanced prompt for question: {question}")
+            enhanced_system_prompt = get_rag_enhanced_prompt(question, max_sources=3)
+            
+            # Get citations from search results for response
+            search_results = valyu_search(question, top_k=5)
+            citations = []
+            for result in search_results:
+                citations.append({
+                    "title": result.get('title', 'Official Source'),
+                    "url": result.get('url', '#'),
+                    "snippet": result.get('snippet', '')[:200] + "..." if len(result.get('snippet', '')) > 200 else result.get('snippet', '')
+                })
 
-        # Use the default instance
-        response = default_llm.call("You are a travel assistant", question)
-
-        
-        # Mock citations for MVP
-        citations = [
-            {"source": "Official Immigration Website", "url": "#"},
-            {"source": "Visa Requirements Document", "url": "#"}
-        ]
-        
-        return Response({
-            'answer': response,
-            'citations': citations
-        }, status=status.HTTP_200_OK)
+            # Get LLM response with RAG-enhanced context (no user message needed since it's in system prompt)
+            response = default_llm.call(enhanced_system_prompt, "", extra_params={
+                "max_tokens": 500,
+                "temperature": 0.3  # Lower temperature for more factual responses
+            })
+            
+            # If no search results were found, add a fallback citation
+            if not citations:
+                citations = [{
+                    "title": "Official Government Sources",
+                    "url": "https://gov.uk",
+                    "snippet": "Please verify information with official government websites"
+                }]
+            
+            logger.info(f"RAG-verified response generated with {len(citations)} citations")
+            
+            return Response({
+                'answer': response,
+                'citations': citations,
+                'rag_verified': True,
+                'source_count': len(search_results)
+            }, status=status.HTTP_200_OK)
+            
+        except ValyuAPIException as e:
+            # If Valyu API fails, fall back to LLM-only response with warning
+            logger.warning(f"Valyu API error: {str(e)}, falling back to LLM-only response")
+            
+            fallback_response = default_llm.call(
+                "You are a travel assistant. IMPORTANT: Always remind users to verify information with official government sources as you don't have access to real-time official data.",
+                question
+            )
+            
+            return Response({
+                'answer': f"⚠️ **Verification temporarily unavailable** - Please verify this information with official sources.\n\n{fallback_response}",
+                'citations': [{
+                    "title": "Please verify with official sources",
+                    "url": "https://gov.uk",
+                    "snippet": "Real-time verification temporarily unavailable"
+                }],
+                'rag_verified': False,
+                'error': 'verification_unavailable'
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Unexpected error in ask_question: {str(e)}")
+            return Response({
+                'error': 'An unexpected error occurred while processing your question'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
