@@ -18,6 +18,15 @@ from .anthropic_service import anthropic_llm
 logger = logging.getLogger(__name__)
 
 
+def get_profile_context_for_prompt(profile: UserProfile, missing_text: str = "Not specified") -> str:
+    """Generates a consistent user profile string for AI prompts."""
+    return (
+        f"- Nationality: {profile.nationality or missing_text}\\n"
+        f"- Visa Interest: {profile.visa_intent or missing_text}\\n"
+        f"- Current Location: {profile.current_location or missing_text}"
+    )
+
+
 class IntelligentVisaAssistantWorkflow:
     """Simple stateless visa assistant - NO INTERNAL LOOPS"""
     
@@ -59,10 +68,8 @@ Focus on capturing any additional context that would help understand their visa 
             # Build user prompt
             user_prompt = (
                 f"User message: \"{message}\""
-                "\n\nCurrent profile context:"
-                f"\n- Current nationality: {profile.nationality or 'Not specified'}"
-                f"\n- Current visa intent: {profile.visa_intent or 'Not specified'}"
-                f"\n- Current location: {profile.current_location or 'Not specified'}"
+                "\\n\\nCurrent profile context:\\n"
+                f"{get_profile_context_for_prompt(profile)}"
             )
 
             if previous_question_context:
@@ -376,9 +383,7 @@ Generate a welcoming message that introduces Mandry AI as a visa and travel assi
         Keep it concise (1-2 sentences) and professional yet friendly."""
         
         user_prompt = f"""User Profile:
-- Nationality: {profile.nationality}
-- Visa Interest: {profile.visa_intent}
-- Current Location: {profile.current_location or 'Not specified'}
+{get_profile_context_for_prompt(profile)}
 
 User's current message: "{message}"
 
@@ -407,9 +412,7 @@ Generate a personalized welcome message."""
         Keep it direct and concise (1-2 sentences maximum). Just ask for what you need."""
         
         user_prompt = f"""Current Profile Information:
-- Nationality: {profile.nationality or 'Not provided'}
-- Visa Interest: {profile.visa_intent or 'Not provided'}
-- Current Location: {profile.current_location or 'Not provided'}
+{get_profile_context_for_prompt(profile)}
 
 User's message: "{message}"
 
@@ -494,9 +497,7 @@ Generate an appropriate response that acknowledges their partial profile and ask
         Keep it direct and concise (1-2 sentences maximum)."""
         
         user_prompt = f"""User Profile:
-- Nationality: {profile.nationality}
-- Visa Interest: {profile.visa_intent}
-- Current Location: {profile.current_location or 'Not specified'}
+{get_profile_context_for_prompt(profile)}
 
 User's latest message: "{message}"
 
@@ -548,9 +549,7 @@ Generate a response confirming you understand their situation and are ready to h
         Do NOT repeat questions about information already provided."""
         
         user_prompt = f"""Current Profile:
-- Nationality: {profile.nationality or 'Missing'}
-- Visa Interest: {profile.visa_intent or 'Missing'}
-- Current Location: {profile.current_location or 'Missing'}
+{get_profile_context_for_prompt(profile)}
 - Destination Country: {profile.destination_country or 'Missing'}
 - Additional Details: {'Provided' if (profile.profile_context or profile.structured_data) else 'Missing'}
 
