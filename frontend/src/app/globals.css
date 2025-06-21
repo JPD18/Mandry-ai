@@ -56,4 +56,16 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* Ensure full-screen layouts work properly */
+  html, body {
+    height: 100%;
+    overflow-x: hidden;
+  }
+  
+  /* Remove default margins and padding that might interfere */
+  body {
+    margin: 0;
+    padding: 0;
+  }
 } 
