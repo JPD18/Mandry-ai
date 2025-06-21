@@ -60,7 +60,7 @@ export function TypingIndicator({ className, onTypingComplete }: TypingIndicator
           </div>
           
           {/* Typing Content */}
-          <div className="flex-1">
+          <div className="flex-1 text-white">
             {typedText}
             {isTyping && (
               <motion.span

@@ -64,7 +64,7 @@ function ChatPageContent() {
 
   const handleTypingComplete = () => {
     setShowTypingIndicator(false);
-    // Add the welcome message as an actual assistant message
+    conversationStarted.current = true;
     const welcomeMessage: Message = {
       id: (Date.now() + 1).toString(),
       role: "assistant",
@@ -310,43 +310,8 @@ function ChatPageContent() {
 
       <div className="pt-20 h-full flex flex-col">
         {/* Top Bar with Assistant Info and Completion */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="flex items-center justify-between p-6 bg-white/5 backdrop-blur-sm border-b border-white/10"
-        >
-          <div className="flex items-center space-x-4">
-            <div
-              className="w-12 h-12 rounded-full flex items-center justify-center border"
-              style={{
-                backgroundColor: "#31B8E9",
-                opacity: 0.4,
-                backdropFilter: "blur(12px)",
-                borderColor: "rgba(49, 184, 233, 0.2)",
-                boxShadow: "inset 0 0 20px rgba(255, 255, 255, 0.3), inset 0 0 40px rgba(255, 255, 255, 0.1)",
-              }}
-            ></div>
-            <div>
-              <h2 className="font-semibold text-white misto-font">Your Assistant</h2>
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <p className="text-sm text-gray-300">online</p>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center space-x-3 text-white">
-            <div className="relative w-32 h-2 bg-gray-600 rounded-full">
-              <motion.div
-                className="absolute top-0 left-0 h-2 bg-green-400 rounded-full"
-                initial={{ width: "0%" }}
-                animate={{ width: `${completionPercentage}%` }}
-                transition={{ duration: 1, ease: "easeOut" }}
-              ></motion.div>
-            </div>
-            <span className="text-sm">{completionPercentage}% context</span>
-          </div>
-        </motion.div>
+        
+            
 
         {/* Main Content */}
         <div className="flex-1 flex overflow-hidden">
