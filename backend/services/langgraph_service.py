@@ -29,6 +29,7 @@ class IntelligentVisaAssistantWorkflow:
     
     def _extract_context_intelligently(self, message: str, profile: UserProfile, missing_areas: List[str]) -> Dict[str, Any]:
         """Extract context information using AI-powered analysis"""
+        logger.info(f"🔍 EXTRACT_CONTEXT - Message: '{message[:50]}...', Current Profile: Nationality={profile.nationality}, Intent={profile.visa_intent}")
         
         try:
             # Create extraction prompt
@@ -67,12 +68,14 @@ Extract any new information from this message."""
                     if key in extraction_result and extraction_result[key] and extraction_result[key].lower() not in ["not specified", "none", "n/a", ""]:
                         cleaned_result[key] = extraction_result[key]
             
+            logger.info(f"✅ AI EXTRACTION SUCCESS: {cleaned_result}")
             return cleaned_result
             
         except Exception as e:
             logger.warning(f"AI extraction failed, falling back to keyword matching: {e}")
             
             # Fallback to keyword matching
+            logger.info(f"🔄 FALLBACK TO KEYWORD EXTRACTION")
             message_lower = message.lower()
             extracted = {}
             
@@ -107,10 +110,12 @@ Extract any new information from this message."""
             elif any(word in message_lower for word in ["business", "investor", "investment"]):
                 extracted["visa_intent"] = "Business visa"
             
+            logger.info(f"✅ KEYWORD EXTRACTION RESULT: {extracted}")
             return extracted
     
     def _update_profile_from_extraction(self, profile: UserProfile, extraction_result: Dict[str, Any]):
         """Update profile with extracted information from AI analysis"""
+        logger.info(f"📝 UPDATE_PROFILE - User: {profile.user.username}, Extraction: {extraction_result}")
         updated = False
         
         # Update nationality if not already set
@@ -157,20 +162,26 @@ Extract any new information from this message."""
         # Only save if we actually updated something
         if updated:
             profile.save()
-            logger.info(f"Updated profile for user {profile.user.id} with: {extraction_result}")
+            logger.info(f"✅ PROFILE UPDATED - User: {profile.user.username}, Changes: {extraction_result}")
+        else:
+            logger.info(f"🔄 NO PROFILE CHANGES - No new information to update")
     
     # Removed complex LLM methods to prevent 400 errors and infinite loops
     
     def process_message(self, user_id: int, message: str, current_state: Dict = None) -> Dict[str, Any]:
         """Process a user message - ONE STEP ONLY, NO LOOPS"""
         
+        logger.info(f"🔄 PROCESS_MESSAGE ENTRY - User {user_id}, Message: '{message[:50]}...', Current State: {current_state.get('current_step') if current_state else 'None'}")
+        
         try:
             # Get user and profile
             user = User.objects.get(id=user_id)
             profile, created = UserProfile.objects.get_or_create(user=user)
+            logger.info(f"📊 Profile Status - User: {user.username}, Nationality: {profile.nationality or 'None'}, Intent: {profile.visa_intent or 'None'}, Context Sufficient: {profile.context_sufficient}")
             
             # Determine current step
             current_step = current_state.get("current_step", "assess_context") if current_state else "assess_context"
+            logger.info(f"🎯 Current Step Determined: {current_step}")
             
             # Restore message history
             message_history = current_state.get("message_history", []) if current_state else []
@@ -179,6 +190,7 @@ Extract any new information from this message."""
             message_history.append({"type": "human", "content": message})
             
             # Process based on current step - EXACTLY ONE STEP
+            logger.info(f"🚀 ROUTING TO HANDLER: {current_step}")
             if current_step == "assess_context":
                 response, next_step = self._handle_assess_context(user, profile, message)
             elif current_step == "gather_context":
@@ -186,8 +198,11 @@ Extract any new information from this message."""
             elif current_step == "intelligent_qna":
                 response, next_step = self._handle_qna(user, profile, message)
             else:
+                logger.info(f"🏁 END STATE REACHED: {current_step}")
                 response = "Thank you for using Mandry AI!"
                 next_step = "end"
+            
+            logger.info(f"✅ HANDLER COMPLETED - Response Length: {len(response)}, Next Step: {next_step}")
             
             # Add AI response to history
             message_history.append({"type": "ai", "content": response})
@@ -217,14 +232,19 @@ Extract any new information from this message."""
     
     def _handle_assess_context(self, user: User, profile: UserProfile, message: str) -> tuple[str, str]:
         """Handle context assessment step with intelligent welcome"""
+        logger.info(f"🔍 ASSESS_CONTEXT HANDLER - User: {user.username}, Message: '{message[:30]}...'")
+        
         # Check if we have basic context
         has_nationality = bool(profile.nationality)
         has_intent = bool(profile.visa_intent)
+        logger.info(f"📋 Context Check - Has Nationality: {has_nationality}, Has Intent: {has_intent}")
         
         # Check if this is a completely new user (empty profile)
         is_new_user = not any([profile.nationality, profile.visa_intent, profile.current_location, profile.conversation_insights])
+        logger.info(f"👤 User Status - Is New User: {is_new_user}")
         
         if has_nationality and has_intent:
+            logger.info(f"✅ COMPLETE CONTEXT - Moving to Q&A mode")
             profile.context_sufficient = True
             profile.save()
             try:
@@ -235,14 +255,16 @@ Extract any new information from this message."""
                 response = f"Hello! I see you're {profile.nationality} interested in {profile.visa_intent}. What specific questions do you have?"
             next_step = "intelligent_qna"
         elif is_new_user:
+            logger.info(f"🆕 NEW USER - Generating welcome message")
             try:
                 # Generate visa-focused welcome message for brand new users
                 response = self._generate_new_user_welcome(message)
             except Exception as e:
                 logger.warning(f"AI new user welcome failed: {e}")
-                response = "Welcome to Mandry AI! 🌍 I'm your personal visa and travel assistant. Whether you're planning to work, study, visit family, or explore new destinations, I'm here to guide you through the visa process. What kind of travel or visa assistance can I help you with today?"
+                response = "👋 Welcome to Mandry AI! I will help you with visa and travel planning assistance.\n\nI will ask you a few questions to understand your plans and intents clearly. There might be multiple questions to best understand your case and needs.\n\nWhat specific visa or travel help do you need?"
             next_step = "gather_context"
         else:
+            logger.info(f"📝 PARTIAL CONTEXT - Generating initial assessment")
             try:
                 # Generate intelligent initial assessment for users with partial info
                 response = self._generate_initial_assessment(profile, message)
@@ -251,21 +273,24 @@ Extract any new information from this message."""
                 response = "Hello! I'm Mandry AI, your visa and travel assistant. I can help you with work visas, student visas, tourist visas, family visas, and more. To provide you with the best guidance, please tell me your nationality and what type of visa or travel assistance you need."
             next_step = "gather_context"
         
+        logger.info(f"🔚 ASSESS_CONTEXT RESULT - Next Step: {next_step}")
         return response, next_step
     
     def _generate_new_user_welcome(self, message: str) -> str:
         """Generate visa-focused welcome message for brand new users"""
+        logger.info(f"🆕 GENERATE_NEW_USER_WELCOME - Message: '{message[:30]}...'")
         
-        system_prompt = """You are Mandry AI, a friendly and professional visa and travel consultant assistant.
+        system_prompt = """You are Mandry AI, a direct and professional visa and travel consultant assistant.
         
-        Generate a warm welcome message for a first-time user that:
+        Generate a welcome message for a first-time user that:
         1. Welcomes them to Mandry AI
-        2. Clearly explains you specialize in visa and travel assistance
-        3. Mentions the types of visa/travel help you provide (work, study, tourism, family, business visas)
-        4. Asks what specific visa or travel assistance they need
-        5. Uses an encouraging, professional tone with appropriate emojis
+        2. Clearly states you will help them with visa and travel planning assistance
+        3. Explains that you will ask questions to understand their plans and intents clearly
+        4. Mentions there might be multiple questions to best understand their case and needs
+        5. Asks what specific visa or travel help they need
+        6. Uses a direct, professional tone - no lengthy explanations
         
-        Keep it engaging but concise (2-3 sentences). Make it clear this is specifically for visa/travel help."""
+        Keep it direct and concise (2-3 sentences). Be straightforward about the process."""
         
         user_prompt = f"""User's first message: "{message}"
 
@@ -277,6 +302,7 @@ Generate a welcoming message that introduces Mandry AI as a visa and travel assi
             extra_params={"max_tokens": 200, "temperature": 0.8}
         )
         
+        logger.info(f"✅ NEW USER WELCOME GENERATED - Length: {len(response)}")
         return response
     
     def _generate_welcome_message(self, profile: UserProfile, message: str) -> str:
@@ -338,15 +364,20 @@ Generate an appropriate response that acknowledges their partial profile and ask
     
     def _handle_gather_context(self, user: User, profile: UserProfile, message: str) -> tuple[str, str]:
         """Handle context gathering step with intelligent follow-up"""
+        logger.info(f"📝 GATHER_CONTEXT HANDLER - User: {user.username}, Message: '{message[:30]}...'")
+        
         # Extract info from message
         extraction_result = self._extract_context_intelligently(message, profile, [])
+        logger.info(f"🔍 EXTRACTION RESULT: {extraction_result}")
         self._update_profile_from_extraction(profile, extraction_result)
         
         # Check if we now have sufficient context
         has_nationality = bool(profile.nationality)
         has_intent = bool(profile.visa_intent)
+        logger.info(f"📊 UPDATED CONTEXT - Has Nationality: {has_nationality}, Has Intent: {has_intent}")
         
         if has_nationality and has_intent:
+            logger.info(f"✅ CONTEXT NOW COMPLETE - Moving to Q&A")
             profile.context_sufficient = True
             profile.save()
             try:
@@ -357,6 +388,7 @@ Generate an appropriate response that acknowledges their partial profile and ask
                 response = f"Great! I understand you're {profile.nationality} and interested in {profile.visa_intent}. What specific questions do you have?"
             next_step = "intelligent_qna"
         else:
+            logger.info(f"⏳ CONTEXT STILL INCOMPLETE - Generating follow-up")
             try:
                 # Generate intelligent follow-up questions
                 response = self._generate_context_follow_up(profile, message, extraction_result)
@@ -368,6 +400,7 @@ Generate an appropriate response that acknowledges their partial profile and ask
                 response = f"Thanks for that information! I still need to know {' and '.join(missing)} to help you better."
             next_step = "gather_context"
         
+        logger.info(f"🔚 GATHER_CONTEXT RESULT - Next Step: {next_step}")
         return response, next_step
     
     def _generate_context_complete_message(self, profile: UserProfile, message: str, extraction_result: Dict[str, Any]) -> str:
@@ -442,14 +475,18 @@ Generate a natural follow-up response asking for the missing information."""
     
     def _handle_qna(self, user: User, profile: UserProfile, message: str) -> tuple[str, str]:
         """Handle Q&A step with intelligent AI responses"""
+        logger.info(f"💬 QNA HANDLER - User: {user.username}, Message: '{message[:30]}...'")
+        
         # Check for end phrases
         message_lower = message.lower()
         end_phrases = ["goodbye", "thank you", "bye", "exit", "quit", "that's all", "thanks"]
         
         if any(phrase in message_lower for phrase in end_phrases):
+            logger.info(f"👋 END PHRASE DETECTED - Ending conversation")
             response = "Thank you for using Mandry AI! Feel free to return anytime with more visa questions!"
             next_step = "end"
         else:
+            logger.info(f"🤖 GENERATING AI RESPONSE")
             try:
                 # Generate intelligent response using AI
                 response = self._generate_intelligent_response(profile, message)
@@ -460,6 +497,7 @@ Generate a natural follow-up response asking for the missing information."""
                 response = f"Thank you for your question about '{message[:50]}...'. As a {profile.nationality or 'person'} interested in {profile.visa_intent or 'visas'}, I'd recommend consulting with official visa requirements. What else would you like to know?"
                 next_step = "intelligent_qna"
         
+        logger.info(f"🔚 QNA RESULT - Next Step: {next_step}")
         return response, next_step
     
     def _generate_intelligent_response(self, profile: UserProfile, user_question: str) -> str:

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ChevronDown, ChevronUp, User, MapPin, Globe, Target, Clock, MessageSquare, RefreshCw } from 'lucide-react'
+import { ChevronDown, ChevronUp, User, MapPin, Globe, Target, Clock, MessageSquare, RefreshCw, Trash2 } from 'lucide-react'
 
 interface UserProfile {
   nationality: string
@@ -29,6 +29,7 @@ export function ProfileDropdown({ isExpanded, onToggle, refreshTrigger = 0 }: Pr
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [clearLoading, setClearLoading] = useState(false)
 
   const fetchProfile = async () => {
     setLoading(true)
@@ -93,6 +94,38 @@ export function ProfileDropdown({ isExpanded, onToggle, refreshTrigger = 0 }: Pr
     })
   }
 
+  const clearProfile = async () => {
+    if (!confirm('Are you sure you want to clear your profile? This action cannot be undone.')) {
+      return
+    }
+
+    setClearLoading(true)
+    setError(null)
+    
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('http://localhost:8000/api/profile/', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        // Refresh the profile data after clearing
+        await fetchProfile()
+      } else {
+        setError('Failed to clear profile')
+      }
+    } catch (err) {
+      setError('Error clearing profile')
+      console.error('Profile clear error:', err)
+    } finally {
+      setClearLoading(false)
+    }
+  }
+
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
@@ -108,15 +141,28 @@ export function ProfileDropdown({ isExpanded, onToggle, refreshTrigger = 0 }: Pr
           </CardTitle>
           <div className="flex items-center gap-2">
             {isExpanded && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={fetchProfile}
-                disabled={loading}
-                className="h-8 w-8 p-0"
-              >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={fetchProfile}
+                  disabled={loading}
+                  className="h-8 w-8 p-0"
+                  title="Refresh profile"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearProfile}
+                  disabled={loading || clearLoading}
+                  className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                  title="Clear profile"
+                >
+                  <Trash2 className={`h-4 w-4 ${clearLoading ? 'animate-pulse' : ''}`} />
+                </Button>
+              </>
             )}
             <Button
               variant="ghost"

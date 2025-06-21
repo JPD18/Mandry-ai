@@ -269,13 +269,14 @@ def logout(request):
         }, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['GET', 'PUT'])
+@api_view(['GET', 'PUT', 'DELETE'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
 def user_profile(request):
     """
     GET /api/profile - Get user profile
     PUT /api/profile - Update user profile
+    DELETE /api/profile - Clear user profile
     """
     profile, created = UserProfile.objects.get_or_create(user=request.user)
     
@@ -289,6 +290,24 @@ def user_profile(request):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        # Clear all profile data while keeping the profile object
+        profile.nationality = ''
+        profile.current_location = ''
+        profile.destination_country = ''
+        profile.visa_intent = ''
+        profile.structured_data = {}
+        profile.profile_context = ''
+        profile.conversation_insights = ''
+        profile.missing_context = []
+        profile.context_sufficient = False
+        profile.last_context_assessment = None
+        profile.save()
+        
+        return Response({
+            'message': 'Profile cleared successfully'
+        }, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
