@@ -5,8 +5,12 @@ import { useState } from "react"
 import { ArrowLeft } from "lucide-react"
 import { useRouter } from 'next/navigation'
 
-export default function AuthPage() {
-  const [isSignUp, setIsSignUp] = useState(false)
+interface AuthPageProps {
+  isSignUp: boolean;
+}
+
+export default function AuthPage({ isSignUp: initialIsSignUp }: AuthPageProps) {
+  const [isSignUp, setIsSignUp] = useState(initialIsSignUp)
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -127,7 +131,7 @@ export default function AuthPage() {
           {/* Form Card */}
           <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-8">
             <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold text-white mb-2">{isSignUp ? "Create account" : "Sign in"}</h2>
+              <h2 className="text-2xl font-bold text-white mb-2">{isSignUp ? "Create account" : "Log in"}</h2>
               <p className="text-gray-300">
                 {isSignUp
                   ? "Enter your information to create your account"
@@ -221,9 +225,9 @@ export default function AuthPage() {
                 disabled={loading}
                 className="w-full py-3 px-6 bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-300 hover:to-yellow-400 text-slate-900 font-semibold rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
-                {loading 
-                  ? (isSignUp ? "Creating account..." : "Signing in...") 
-                  : (isSignUp ? "Create account" : "Sign in")
+                {loading
+                  ? (isSignUp ? "Creating account..." : "Logging in...")
+                  : (isSignUp ? "Create account" : "Log in")
                 }
               </button>
             </form>
@@ -245,7 +249,7 @@ export default function AuthPage() {
                   }}
                   className="text-yellow-400 hover:text-yellow-300 font-medium transition-colors duration-200"
                 >
-                  {isSignUp ? "Sign in" : "Sign up"}
+                  {isSignUp ? "Log in" : "Sign up"}
                 </button>
               </p>
             </div>
