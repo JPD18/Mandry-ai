@@ -11,7 +11,7 @@ class LLMService:
                  base_url: str = None,
                  model_name: str = None,
                  timeout: int = 20):
-        self.base_url = base_url or os.getenv("OLLAMA_URL", "http://127.0.0.1:8003/v1/chat/completions")
+        self.base_url = base_url or os.getenv("OLLAMA_URL", "http://127.0.0.1:11434/v1/chat/completions")
         self.model = model_name or os.getenv("OLLAMA_MODEL", "gemma3")
         self.timeout = timeout
         self.headers = {
