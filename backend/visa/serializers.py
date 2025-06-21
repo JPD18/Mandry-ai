@@ -1,18 +1,5 @@
 from rest_framework import serializers
-from .models import UploadedDocument, Appointment
-
-
-class UploadedDocumentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = UploadedDocument
-        fields = ['id', 'filename', 'uploaded_at', 'file_type']
-
-
-class AppointmentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Appointment
-        fields = ['id', 'user_name', 'appointment_type', 'scheduled_date', 'notes']
-
+from .models import Appointment
 
 
 class FileUploadSerializer(serializers.Serializer):
@@ -25,19 +12,21 @@ class QuestionSerializer(serializers.Serializer):
 
 class ScheduleSerializer(serializers.Serializer):
     user = serializers.CharField(max_length=100)
-    type = serializers.CharField(max_length=50)
+    type = serializers.ChoiceField(choices=[
+        'consultation', 'document_review', 'application_submission', 'interview_prep'
+    ])
     iso_date = serializers.DateTimeField()
 
 
 class UserSignupSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     email = serializers.EmailField()
-    password = serializers.CharField(min_length=8, write_only=True)
+    password = serializers.CharField(min_length=8)
 
 
 class UserLoginSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
-    password = serializers.CharField(write_only=True)
+    password = serializers.CharField()
 
 
 class DocumentProcessSerializer(serializers.Serializer):

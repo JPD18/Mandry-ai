@@ -158,6 +158,7 @@ VALIDATION CRITERIA:
 2. Is the text properly formatted and readable?
 3. Does it appear to be a legitimate document (not gibberish or corrupted)?
 4. Is there sufficient content to be considered a valid document?
+5. Are the expiration dates of the document valid? The current date is 22/06/2025
 
 TEXT TO VALIDATE:
 {text_for_validation}
@@ -182,7 +183,23 @@ Response:"""
             # Parse LLM response
             try:
                 import json
-                result = json.loads(response.strip())
+                import re
+                
+                # Clean response - remove markdown code blocks if present
+                cleaned_response = response.strip()
+                
+                # Remove ```json...``` wrapper if present
+                json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', cleaned_response, re.DOTALL)
+                if json_match:
+                    cleaned_response = json_match.group(1)
+                
+                # Try to extract JSON from response if it's not clean
+                if not cleaned_response.startswith('{'):
+                    json_match = re.search(r'\{.*\}', cleaned_response, re.DOTALL)
+                    if json_match:
+                        cleaned_response = json_match.group(0)
+                
+                result = json.loads(cleaned_response)
                 
                 # Validate response format
                 if not isinstance(result, dict) or 'is_valid' not in result:
