@@ -181,8 +181,14 @@ class LLMService:
 default_llm = LLMService()
 
 RAG PROMPT-  create a rag based on this search, so extracting the main query from the users question, sending it to the valyu api, and feeding its response to the llm to enrich its context
+## Implementing a static folder serving from djanogo:
+
 
 Citations prompt- so in the chat page, when context is retrieved it is correctly fed to the LLM and then passed to the UI however the citations format and text formatting of the q&a does not work, investigate this and create a plan to make clear citations and text formatting
 
 doc processing promtp - ok so for document upload it uploads docs but doesnt do anything, similar to valyu.py for search I want to make a modular section for doc upload and extraction so extracting the text from the doc for verification, the documents uploaded should not be stored anywhere only processed, the basic flow is upload doc, extract text, feed text to llm that verfies validity and returns true or false to it
 this is the basic idea so keep it simple maintainable and modular for us to exntend it and change it easily in future
+
+I have frontend files located in @/frontend folder which is build by npm run build and then I need to run next export. afterwards I need to move all of the static files to the new folder called static in @/backend, afterwards add code to backend for django server to serve static content there at the root of the api
+Citations prompt- so in the chat page, when context is retrieved it is correctly fed to the LLM and then passed to the UI however the citations format and text formatting of the q&a does not work, investigate this and create a plan to make clear citations and text formatting
+
