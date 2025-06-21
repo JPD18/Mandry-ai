@@ -40,9 +40,9 @@ class AnthropicLLMService:
     
     def call(
         self,
-        system_prompt: str | None = None,
-        user_message: str | None = None,
-        extra_params: Dict[str, Any] | None = None,
+        system_prompt: Optional[str] = None,
+        user_message: Optional[str] = None,
+        extra_params: Optional[Dict[str, Any]] = None,
     ) -> str:
         """High-level convenience wrapper for Anthropic chat-completion endpoints.
 
@@ -240,7 +240,7 @@ class AnthropicLLMService:
         self,
         system_prompt: str,
         user_message: str = "",
-        extra_params: Dict[str, Any] = None
+        extra_params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Make a call expecting JSON response from Anthropic
