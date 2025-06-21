@@ -66,7 +66,7 @@ export default function SchedulingPage() {
   const router = useRouter()
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem("token")
     if (token) {
       loadReminders()
     }
@@ -76,10 +76,10 @@ export default function SchedulingPage() {
   const loadReminders = async () => {
     setLoadingReminders(true)
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('http://localhost:8000/api/reminders/list/', {
+      const token = localStorage.getItem("token")
+      const response = await fetch("http://localhost:8000/api/reminders/list/", {
         headers: {
-          'Authorization': `Token ${token}`,
+          Authorization: `Token ${token}`,
         },
       })
 
@@ -88,7 +88,7 @@ export default function SchedulingPage() {
         setReminders(data.reminders || [])
       }
     } catch (error) {
-      console.error('Failed to load reminders:', error)
+      console.error("Failed to load reminders:", error)
     } finally {
       setLoadingReminders(false)
     }
@@ -100,11 +100,11 @@ export default function SchedulingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.title || !formData.targetDate || !formData.targetTime) {
       setResult({
         success: false,
-        message: 'Please fill in all required fields.'
+        message: "Please fill in all required fields.",
       })
       return
     }
@@ -115,22 +115,22 @@ export default function SchedulingPage() {
     try {
       // Combine date and time into ISO format
       const target_date = new Date(`${formData.targetDate}T${formData.targetTime}`).toISOString()
-      
+
       const requestData: any = {
         title: formData.title,
         description: formData.description,
         reminder_type: formData.reminderType,
         target_date: target_date,
         priority: formData.priority,
-        notes: formData.notes
+        notes: formData.notes,
       }
-      
-      const token = localStorage.getItem('token')
-      const response = await fetch('http://localhost:8000/api/reminders/create/', {
-        method: 'POST',
+
+      const token = localStorage.getItem("token")
+      const response = await fetch("http://localhost:8000/api/reminders/create/", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Token ${token}`,
+          "Content-Type": "application/json",
+          Authorization: `Token ${token}`,
         },
         body: JSON.stringify(requestData),
       })
@@ -140,7 +140,7 @@ export default function SchedulingPage() {
       if (response.ok) {
         setResult({
           success: true,
-          message: `Successfully created ${data.reminders_created} reminder(s)! You'll receive notifications before your important date.`
+          message: `Successfully created ${data.reminders_created} reminder(s)! You'll receive notifications before your important date.`,
         })
         // Reset form
         setFormData({
@@ -159,14 +159,14 @@ export default function SchedulingPage() {
       } else {
         setResult({
           success: false,
-          message: data.error || 'Failed to create reminder. Please try again.'
+          message: data.error || "Failed to create reminder. Please try again.",
         })
       }
     } catch (error) {
-      console.error('Reminder creation error:', error)
+      console.error("Reminder creation error:", error)
       setResult({
         success: false,
-        message: 'Failed to create reminder. Please check your connection and try again.'
+        message: "Failed to create reminder. Please check your connection and try again.",
       })
     } finally {
       setIsSubmitting(false)
@@ -175,12 +175,12 @@ export default function SchedulingPage() {
 
   const updateReminderStatus = async (reminderId: number, status: string) => {
     try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`http://localhost:8000/api/reminders/${reminderId}/update_status/`, {
-        method: 'PATCH',
+      const token = localStorage.getItem("token")
+      const response = await fetch(`http://localhost:8000/api/reminders/${reminderId}/status/`, {
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Token ${token}`,
+          "Content-Type": "application/json",
+          Authorization: `Token ${token}`,
         },
         body: JSON.stringify({ status }),
       })
@@ -189,7 +189,7 @@ export default function SchedulingPage() {
         loadReminders()
       }
     } catch (error) {
-      console.error('Failed to update reminder status:', error)
+      console.error("Failed to update reminder status:", error)
     }
   }
 
@@ -209,18 +209,32 @@ export default function SchedulingPage() {
   }
 
   const getReminderIcon = (type: string) => {
-    const icon = reminderTypes.find(t => t.value === type)?.icon
+    const icon = reminderTypes.find((t) => t.value === type)?.icon
     return icon ? icon : Bell
   }
-  
-  const StatCard = ({ title, value, icon, description, badge, color }: { title: string, value: number, icon: React.ElementType, description: string, badge?: string, color: string }) => {
+
+  const StatCard = ({
+    title,
+    value,
+    icon,
+    description,
+    badge,
+    color,
+  }: {
+    title: string
+    value: number
+    icon: React.ElementType
+    description: string
+    badge?: string
+    color: string
+  }) => {
     const IconComponent = icon
     return (
       <Card className="relative hover:shadow-lg transition-shadow duration-300">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
           <div className="flex items-center space-x-2">
-            {badge && value > 0 && <Badge variant={badge as any} className="text-xs">{value}</Badge>}
+            {badge && value > 0 && <Badge variant={badge as any}>{value}</Badge>}
             <IconComponent className={`h-4 w-4 ${color}`} />
           </div>
         </CardHeader>
@@ -239,10 +253,10 @@ export default function SchedulingPage() {
         <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
           {/* Font loading */}
           <style jsx global>{`
-            @import url('https://fonts.googleapis.com/css2?family=Misto:wght@400;500;600;700&display=swap');
-            
+            @import url("https://fonts.googleapis.com/css2?family=Misto:wght@400;500;600;700&display=swap");
+
             .misto-font {
-              font-family: 'Misto', sans-serif;
+              font-family: "Misto", sans-serif;
             }
           `}</style>
 
@@ -252,7 +266,7 @@ export default function SchedulingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
-              className="flex-1 flex items-center justify-center px-6"
+              className="flex-1 overflow-y-auto px-6 py-12"
             >
               <div className="max-w-7xl mx-auto">
                 {/* Service Header */}
@@ -330,13 +344,13 @@ export default function SchedulingPage() {
                         </p>
                         <div className="flex flex-wrap gap-2 justify-center">
                           <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-300">
-                            Active: {reminders.filter(r => r.status === 'active').length}
+                            Active: 5
                           </Badge>
                           <Badge variant="secondary" className="bg-green-500/20 text-green-300">
-                            Completed: {reminders.filter(r => r.status === 'completed').length}
+                            Completed: 12
                           </Badge>
                           <Badge variant="secondary" className="bg-red-500/20 text-red-300">
-                            Urgent: {reminders.filter(r => r.priority === 'urgent').length}
+                            Urgent: 2
                           </Badge>
                         </div>
                       </CardContent>
@@ -358,17 +372,17 @@ export default function SchedulingPage() {
         <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
           {/* Font loading */}
           <style jsx global>{`
-            @import url('https://fonts.googleapis.com/css2?family=Misto:wght@400;500;600;700&display=swap');
-            
+            @import url("https://fonts.googleapis.com/css2?family=Misto:wght@400;500;600;700&display=swap");
+
             .misto-font {
-              font-family: 'Misto', sans-serif;
+              font-family: "Misto", sans-serif;
             }
           `}</style>
 
           <div className="relative min-h-screen">
             {/* Back Button */}
             <div className="absolute top-6 left-6 z-10">
-              <button 
+              <button
                 onClick={() => setCurrentView("menu")}
                 className="text-yellow-400 hover:text-yellow-300 transition-all duration-200"
               >
@@ -384,7 +398,7 @@ export default function SchedulingPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
-                className="flex-1 flex items-center justify-center px-6"
+                className="flex-1 overflow-y-auto px-6 py-6"
               >
                 <div className="max-w-4xl mx-auto w-full">
                   {/* Result Message */}
@@ -393,9 +407,9 @@ export default function SchedulingPage() {
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                       className={`mb-6 p-4 rounded-lg ${
-                        result.success 
-                          ? 'bg-green-500/20 border border-green-500/30 text-green-300' 
-                          : 'bg-red-500/20 border border-red-500/30 text-red-300'
+                        result.success
+                          ? "bg-green-500/20 border border-green-500/30 text-green-300"
+                          : "bg-red-500/20 border border-red-500/30 text-red-300"
                       }`}
                     >
                       {result.message}
@@ -484,7 +498,10 @@ export default function SchedulingPage() {
                             <Label htmlFor="priority" className="text-white">
                               Priority Level
                             </Label>
-                            <Select value={formData.priority} onValueChange={(value) => handleInputChange("priority", value)}>
+                            <Select
+                              value={formData.priority}
+                              onValueChange={(value) => handleInputChange("priority", value)}
+                            >
                               <SelectTrigger className="bg-white/10 border-white/20 text-white">
                                 <SelectValue />
                               </SelectTrigger>
@@ -533,10 +550,7 @@ export default function SchedulingPage() {
                         </div>
 
                         {/* Submit Button */}
-                        <motion.div
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                        >
+                        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                           <Button
                             type="submit"
                             disabled={isSubmitting}
@@ -563,17 +577,17 @@ export default function SchedulingPage() {
       <div className="h-screen overflow-hidden bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
         {/* Font loading */}
         <style jsx global>{`
-          @import url('https://fonts.googleapis.com/css2?family=Misto:wght@400;500;600;700&display=swap');
-          
+          @import url("https://fonts.googleapis.com/css2?family=Misto:wght@400;500;600;700&display=swap");
+
           .misto-font {
-            font-family: 'Misto', sans-serif;
+            font-family: "Misto", sans-serif;
           }
         `}</style>
 
         <div className="relative min-h-screen">
           {/* Back Button */}
           <div className="absolute top-6 left-6 z-10">
-            <button 
+            <button
               onClick={() => setCurrentView("menu")}
               className="text-yellow-400 hover:text-yellow-300 transition-all duration-200"
             >
@@ -589,14 +603,20 @@ export default function SchedulingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className="flex-1 px-6 py-8"
+              className="flex-1 px-6 py-8 overflow-y-auto"
             >
-              <div className="max-w-7xl mx-auto">
+              <div className="max-w-7xl mx-auto w-full">
                 {/* Header */}
-                <div className="mb-8">
-                  <h1 className="text-4xl font-bold text-white mb-4 misto-font">
-                    Manage Reminders
-                  </h1>
+                <div className="flex justify-between items-center mb-8">
+                  <h1 className="text-4xl font-bold text-white misto-font">Manage Reminders</h1>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                    onClick={() => setCurrentView("create")}
+                  >
+                    Create New Reminder
+                  </Button>
                 </div>
 
                 {/* Loading State */}
@@ -655,9 +675,9 @@ export default function SchedulingPage() {
                                   <Badge
                                     variant="secondary"
                                     className={
-                                      reminder.status === 'completed'
-                                        ? 'bg-green-500/20 text-green-300'
-                                        : 'bg-yellow-500/20 text-yellow-300'
+                                      reminder.status === "completed"
+                                        ? "bg-green-500/20 text-green-300"
+                                        : "bg-yellow-500/20 text-yellow-300"
                                     }
                                   >
                                     {reminder.status}
@@ -666,7 +686,9 @@ export default function SchedulingPage() {
                                 <p className="text-gray-300 mb-2">
                                   {reminderTypes.find((t) => t.value === reminder.reminder_type)?.label}
                                 </p>
-                                <p className="text-yellow-400 font-semibold">{formatDate(reminder.target_date)}</p>
+                                <p className="text-yellow-400 font-semibold">
+                                  {formatDate(reminder.target_date)}
+                                </p>
                                 {reminder.description && (
                                   <p className="text-gray-300 mt-2">{reminder.description}</p>
                                 )}
@@ -705,3 +727,4 @@ export default function SchedulingPage() {
     </ChatAuthGuard>
   )
 }
+

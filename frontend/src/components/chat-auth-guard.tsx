@@ -70,4 +70,4 @@ export function ChatAuthGuard({ children }: ChatAuthGuardProps) {
       )}
     </>
   )
-} 
+}
