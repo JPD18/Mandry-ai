@@ -95,7 +95,7 @@ OLLAMA_MODEL=gemma3
 
 # Search Service
 VALYU_API_KEY=your-valyu-api-key-here
-
+```
 ### Required API Keys
 - **Anthropic API Key**: For Claude AI integration - get from [Anthropic Console](https://console.anthropic.com/)
 - **Valyu API Key**: For real-time government data search - contact Valyu for access
