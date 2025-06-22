@@ -25,6 +25,7 @@ interface Message {
     url: string
     snippet: string
   }>
+  ragVerified?: boolean
 }
 
 interface SessionState {
@@ -95,6 +96,7 @@ function ChatPageContent() {
           role: "assistant",
           content: data.response,
           citations: data.citations || [],
+          ragVerified: data.rag_verified ?? true,
         };
         setMessages((prev) => [...prev, assistantMessage]);
         setSessionState(data.session_state);
@@ -106,6 +108,7 @@ function ChatPageContent() {
           id: (Date.now() + 1).toString(),
           role: "assistant",
           content: "I'm sorry, I couldn't process your request. Please try again or check your authentication.",
+          ragVerified: false,
         };
         setMessages((prev) => [...prev, assistantMessage]);
       }
@@ -115,6 +118,7 @@ function ChatPageContent() {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: "I'm sorry, there was an error connecting to the server. Please check your internet connection and try again.",
+        ragVerified: false,
       };
       setMessages((prev) => [...prev, assistantMessage]);
     } finally {
@@ -154,6 +158,7 @@ function ChatPageContent() {
             role: "assistant",
             content: data.response,
             citations: data.citations || [],
+            ragVerified: data.rag_verified ?? true,
           }
           setMessages((prev) => [...prev, assistantMessage])
           setSessionState(data.session_state);
@@ -167,6 +172,7 @@ function ChatPageContent() {
             id: (Date.now() + 1).toString(),
             role: "assistant",
             content: "I'm sorry, I couldn't process your request. Please try again or check your authentication.",
+            ragVerified: false,
           }
           setMessages((prev) => [...prev, assistantMessage])
         }
@@ -176,6 +182,7 @@ function ChatPageContent() {
           id: (Date.now() + 1).toString(),
           role: "assistant",
           content: "I'm sorry, there was an error connecting to the server. Please check your internet connection and try again.",
+          ragVerified: false,
         }
         setMessages((prev) => [...prev, assistantMessage])
       } finally {
@@ -368,7 +375,7 @@ function ChatPageContent() {
                           <>
                             <MarkdownRenderer content={msg.content} citations={msg.citations} />
                             {msg.citations && msg.citations.length > 0 && (
-                              <CitationList citations={msg.citations} />
+                              <CitationList citations={msg.citations} ragVerified={msg.ragVerified} />
                             )}
                           </>
                         ) : (

@@ -632,14 +632,16 @@ def langgraph_chat(request):
             if result.get('last_question'):
                 session_state_out['last_question'] = result['last_question']
 
+            citations_list = result.get('citations', [])
             return Response({
                 'response': result['response'],
                 'current_step': result['current_step'],
                 'context_sufficient': result['context_sufficient'],
                 'missing_context_areas': result['missing_context_areas'],
                 'session_data': result['session_data'],
-                'citations': result.get('citations', []),
-                'source_count': result.get('source_count', len(result.get('citations', []))),
+                'citations': citations_list,
+                'rag_verified': bool(citations_list),
+                'source_count': result.get('source_count', len(citations_list)),
                 'session_state': session_state_out,
                 'message_history': result['message_history']
             }, status=status.HTTP_200_OK)

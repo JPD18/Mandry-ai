@@ -18,7 +18,8 @@ interface MarkdownRendererProps {
 export function MarkdownRenderer({ content, citations = [], className = '' }: MarkdownRendererProps) {
   // Transform citation references [Source X] into clickable superscripts that link directly to the source URL when available
   const transformCitations = (text: string) => {
-    return text.replace(/\[Source (\d+)\]/g, (_, sourceNumber) => {
+    // Match variations like [Source1], [source 1], [SOURCE 2]
+    return text.replace(/\[source\s*(\d+)\]/gi, (_, sourceNumber) => {
       const index = parseInt(sourceNumber, 10) - 1
       const citation = citations[index]
       // Fallback to footnote anchor if url not found

@@ -697,8 +697,9 @@ Ask for the specific missing information. Do not repeat questions about informat
         
         search_query = " ".join(query_parts)
         # Use RAG to get an enhanced prompt and sources for citations
+        # Combine the explicit user question and the constructed search query with a clear separator
         enhanced_prompt, sources = default_search_service.get_rag_enhanced_prompt_with_sources(
-            user_question=user_question + search_query,
+            user_question=f"{user_question}\n\n{search_query}",
             max_sources=5
         )
 
@@ -706,13 +707,13 @@ Ask for the specific missing information. Do not repeat questions about informat
         final_prompt = f"""{enhanced_prompt}
 
 Here is some additional user profile information to further personalize the response:
-{context_str}
+{context_str} use the context to recommend the best visa options for the user.
 """
 
         response = anthropic_llm.call(
             system_prompt=final_prompt,
             user_message="",  # User question is already in the enhanced_prompt
-            extra_params={"max_tokens": 400, "temperature": 0.7}
+            extra_params={"temperature": 0.2}
         )
         
         return response, sources

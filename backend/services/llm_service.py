@@ -58,7 +58,7 @@ class LLMService:
                     {"role": "system", "content": system_prompt or ""},
                     {"role": "user", "content": user_message or ""},
                 ],
-                "temperature": 0.9,
+                "temperature": 0.2,
                 "max_tokens": 100,
                 "presence_penalty": 0.4,
                 "frequency_penalty": 0.8,
