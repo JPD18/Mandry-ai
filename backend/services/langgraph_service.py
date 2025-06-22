@@ -82,7 +82,7 @@ Focus on capturing any additional context that would help understand their visa 
             extraction_result = anthropic_llm.call_for_json(
                 system_prompt=system_prompt,
                 user_message=user_prompt,
-                extra_params={"max_tokens": 500, "temperature": 0.3}
+                extra_params={"max_tokens": 1000, "temperature": 0.3}
             )
             
             # Validate and clean the extraction result
@@ -441,7 +441,7 @@ Generate an appropriate response that acknowledges their partial profile and ask
         response = anthropic_llm.call(
             system_prompt=system_prompt,
             user_message=user_prompt,
-            extra_params={"max_tokens": 200, "temperature": 0.8}
+            extra_params={ "temperature": 0.5}
         )
         
         return response
@@ -509,6 +509,7 @@ Generate an appropriate response that acknowledges their partial profile and ask
             f"General visa requirements and required documents for a {profile.nationality} citizen",
             f"applying for a {profile.visa_intent}",
             f"to {profile.destination_country}",
+            f"with the following extra profile information: {profile.profile_context}",
         ]
         if profile.current_location:
             query_parts.append(f"from {profile.current_location}")
@@ -525,7 +526,7 @@ Generate an appropriate response that acknowledges their partial profile and ask
         try:
             rag_prompt, sources = default_search_service.get_rag_enhanced_prompt_with_sources(
                 user_question=search_query,
-                max_sources=3
+                max_sources=5
             )
         except Exception as e:
             logger.error(f"RAG search failed in initial info provider: {e}")
@@ -538,7 +539,7 @@ Generate an appropriate response that acknowledges their partial profile and ask
             response = anthropic_llm.call(
                 system_prompt=rag_prompt,  # This is a full prompt with context and instructions
                 user_message="",  # The user question is already in the rag_prompt
-                extra_params={"max_tokens": 600, "temperature": 0.5}
+                extra_params={"max_tokens": 2000, "temperature": 0.5}
             )
             
             # Add a concluding question.
@@ -579,7 +580,7 @@ Generate a response confirming you understand their situation and are ready to h
         response = anthropic_llm.call(
             system_prompt=system_prompt,
             user_message=user_prompt,
-            extra_params={"max_tokens": 200, "temperature": 0.7}
+            extra_params={"max_tokens": 500, "temperature": 0.7}
         )
         
         return response
@@ -662,7 +663,7 @@ Ask for the specific missing information. Do not repeat questions about informat
                 next_step = "intelligent_qna"
                 citations = []
         
-        logger.info(f"🔚 QNA RESULT - Next Step: {next_step}, Citations: {len(citations)}")
+        logger.info(f"🔚 QNA RESULT{response} - Next Step: {next_step}, Citations: {len(citations)}")
         return response, next_step, citations
     
     def _generate_intelligent_response(self, profile: UserProfile, user_question: str) -> tuple[str, List[Dict[str, Any]]]:
@@ -689,6 +690,7 @@ Ask for the specific missing information. Do not repeat questions about informat
             f"General visa requirements and required documents for a {profile.nationality} citizen",
             f"applying for a {profile.visa_intent}",
             f"to {profile.destination_country}",
+            f"with the following extra profile information: {profile.profile_context}",
         ]
         if profile.current_location:
             query_parts.append(f"from {profile.current_location}")
@@ -697,7 +699,7 @@ Ask for the specific missing information. Do not repeat questions about informat
         # Use RAG to get an enhanced prompt and sources for citations
         enhanced_prompt, sources = default_search_service.get_rag_enhanced_prompt_with_sources(
             user_question=user_question + search_query,
-            max_sources=3
+            max_sources=5
         )
 
         # Augment the RAG prompt with detailed profile context

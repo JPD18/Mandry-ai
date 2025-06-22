@@ -93,8 +93,8 @@ class AnthropicLLMService:
 
             payload = {
                 "model": self.model,
-                "max_tokens": extra_params.get("max_tokens", 1000),
-                "temperature": extra_params.get("temperature", 0.7),
+                "max_tokens": extra_params.get("max_tokens", 2000),
+                "temperature": extra_params.get("temperature", 0.2),
                 "messages": [
                     {"role": "user", "content": final_user_message or ""}
                 ]

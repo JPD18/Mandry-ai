@@ -106,6 +106,6 @@ class LLMService:
 
 # you can export a singleton for convenience
 
-default_llm = AnthropicLLMService() 
-fault_llm = LLMService()
+defau_llm = AnthropicLLMService() 
+default_llm = LLMService()
 

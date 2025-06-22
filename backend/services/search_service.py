@@ -25,12 +25,14 @@ def extract_main_query(user_question: str) -> str:
 
         INSTRUCTIONS:
         1. Keep the main subject and intent of the original question
+        2. If the user is asking about a specific country, use that country in the search question
+        4. if there is any information about the user's profile, include it in the search question
         3. Focus on government sources andc information
         4. Make it a concise search question THAT FRAMES THE QUERY AS A QUESTION e.g. what is where are who is etc
         6. keep it 100 tokens max
         Original question: "{user_question}"
 
-        Return only the UK-focused search question, nothing else."""
+        Return only the search question, nothing else."""
 
         uk_query = default_llm.call(
             uk_focused_prompt,
@@ -194,7 +196,7 @@ def get_rag_context_and_sources(user_question: str, max_sources: int = 3) -> tup
 def get_rag_enhanced_prompt_with_sources(user_question: str, max_sources: int = 3) -> tuple[str, List[Dict[str, Any]]]:
     logger.info(f"Getting RAG enhanced prompt with sources for user question: {user_question}")
     rag_context, sources = get_rag_context_and_sources(user_question, max_sources)
-    enhanced_prompt = f"""You are a knowledgeable travel and visa assistant for the united kingdom with access to official sources.
+    enhanced_prompt = f"""You are a knowledgeable travel and visa assistant with access to official sources.
 
     {rag_context}
 
